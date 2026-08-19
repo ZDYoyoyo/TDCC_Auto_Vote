@@ -1,2 +1,9 @@
 playwright>=1.44
 PyYAML>=6.0
+
+# Python 3.9 專用上限。
+# 原因（已查證 PyPI）：greenlet 3.2.5 沒有 cp39 的 Windows 預編譯 wheel，
+# 而 pip 只會挑最新版、發現沒 wheel 就直接抓原始碼編譯（不會自己退回舊版），
+# 於是要求安裝 Visual C++ Build Tools。3.2.4 有 cp39-win_amd64 wheel。
+# Python 3.10 以上不受這行影響。
+greenlet<3.2.5; python_version < "3.10"

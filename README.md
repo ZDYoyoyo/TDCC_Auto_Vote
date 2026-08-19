@@ -12,8 +12,11 @@
 
 ### 第一次使用
 
-1. 先裝好 [Python](https://www.python.org/downloads/)（3.10 以上，**安裝時要勾「Add Python to PATH」**）
-2. 雙擊 **`0_安裝環境.bat`**，等它跑完
+1. 先裝好 [Python](https://www.python.org/downloads/)（**3.9 以上**，建議 3.12；
+   **安裝時要勾「Add python.exe to PATH」**）
+2. 雙擊 **`0_安裝環境.bat`**，等它跑完（第一次要下載約 150MB 的瀏覽器，會比較久）
+
+裝不起來時看下面的「常見問題」。
 
 ### 每次使用
 
@@ -39,6 +42,22 @@
 `explore/` 裡面會有你的**姓名、身分證字號、持股明細**。
 已經設定成不會被上傳到 GitHub，但**請不要自己把它貼到公開的地方**。
 要給我分析的時候，優先給 `structure.md`（個資比較少），必要時再遮掉敏感欄位。
+
+### 常見問題
+
+**跑 `0_安裝環境.bat` 出現一大串紅字，最後說 `Microsoft Visual C++ 14.0 or greater is required`**
+
+不用去裝那個 Visual C++。原因是 pip 抓了一個沒有現成安裝檔的套件版本，跑去自己編譯。
+已經在 `requirements.txt` 擋掉了，**請先用 `git pull` 更新專案，再跑一次 `0_安裝環境.bat`**。
+
+**視窗跳出一堆 `'xxx' is not recognized as an internal or external command`**
+
+舊版的 `.bat` 在錯誤訊息裡寫了中文，被 Windows 命令列拆錯了。同樣更新專案後就沒事。
+
+**用 Microsoft Store 裝的 Python**
+
+可以動，但 Store 版的檔案路徑被系統改寫過，偶爾會出怪問題。
+如果遇到說不上來的錯誤，改裝 [python.org](https://www.python.org/downloads/) 的版本。
 
 ---
 
@@ -76,5 +95,9 @@ PYTHONPATH=src python -m tdcc_vote.explore --help
 | `src/tdcc_vote/browser.py` | 有頭 + 持久化 profile 的瀏覽器啟動（不做任何指紋偽裝） |
 | `src/tdcc_vote/login_gate.py` | 停下來等人工登入，靠網址進入 `/evote/shareholder/` 判定成功 |
 | `src/tdcc_vote/explore.py` | 偵查工具 |
+
+⚠️ **`.bat` 檔內容一律只用 ASCII（連 `REM` 註解也是）**。cmd 解析 .bat 用的是系統
+預設編碼，即使先 `chcp 65001`，中文字仍可能被拆成看似指令的片段而報錯（已實際踩過）。
+要給人看的中文說明，一律由 Python 程式印出。
 
 環境變數 `TDCC_CHROMIUM_PATH` 可指定 Chromium 執行檔（自訂安裝或 CI 用）。
