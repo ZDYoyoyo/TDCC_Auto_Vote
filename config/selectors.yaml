@@ -1,0 +1,49 @@
+# 集保「股東e服務」網站的元素定位表
+#
+# ⚠️ 平台改版時，原則上「只需要改這一個檔」，程式碼不用動。
+#
+# 每一項都標了來源：
+#   [已驗證] = 2026-08-19 實際抓取未登入的靜態 HTML 確認過（見 docs/PLAN.md 事實表）
+#   [待填]   = 需要登入後才看得到，請跑「1_偵查頁面結構.bat」用真實頁面填進來
+#
+# 規則：不准憑空猜。填不出來就留 TODO，不要寫一個「看起來合理」的選擇器。
+
+login:
+  # [已驗證] 股東登入頁
+  url: "https://stockservices.tdcc.com.tw/evote/login/shareholder.html"
+
+  # [已驗證] 身分證／統編欄位（maxlength=18）
+  id_input: 'input[name="pageIdNo"]'
+
+  # [已驗證] 密碼欄位（maxlength=12）
+  password_input: 'input[name="pageUserPwd"]'
+
+  # [已驗證] 登入成功後網址會進入 /evote/shareholder/ 底下
+  # （例：/evote/shareholder/000/tc_estock_welshas_tmp.html、/evote/shareholder/109/emeeting.html）
+  # 本程式用「網址是否進入這個路徑」判斷你登入好了沒。
+  logged_in_url_contains: "/evote/shareholder/"
+
+# ── 以下全部待填：登入後的頁面目前沒有任何真實 DOM ──────────────────
+meetings:
+  # [待填] 「可投票股東會清單」的入口連結
+  entry_link: null
+  # [待填] 清單每一列
+  row: null
+  # [待填] 列內的股票代號 / 公司名稱 / 開會日期 / 投票狀態 / 進入投票的按鈕
+  row_stock_code: null
+  row_company: null
+  row_meeting_date: null
+  row_status: null
+  row_vote_button: null
+
+vote:
+  # [待填] 議案區塊、贊成/反對/棄權選項、全選按鈕（若平台有的話）
+  proposal_block: null
+  choice_agree: null
+  choice_disagree: null
+  choice_abstain: null
+  select_all_agree: null
+  # [待填] 送出 / 確認 / 完成
+  submit_button: null
+  confirm_button: null
+  done_marker: null

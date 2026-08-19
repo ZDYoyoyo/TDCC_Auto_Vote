@@ -1,0 +1,14 @@
+# 帳密與登入狀態（等同帳號憑證，絕不 commit）
+.env
+profile/
+
+# 偵查／存證產出：含姓名、身分證、持股明細等個資
+explore/
+evidence/
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
