@@ -1,0 +1,25 @@
+<!doctype html><html lang="zh-TW"><head><meta charset="utf-8">
+<title>FIXTURE 清單頁</title></head><body>
+<h1>投票作業</h1>
+<table id="stockInfo">
+  <tr><th>證券代號公司簡稱</th><th>會議日期投票起迄日</th><th>投票狀況</th><th>作業項目</th><th>符合eGift發放資格</th></tr>
+  <tr><td>1101 台泥</td><td>115/10/13 115/09/28~115/10/10</td><td>未投票</td>
+      <td><a class="c-actLink" href="#" onclick="getOverlapMeeting('1101','vote','20261013');">投票</a>
+          <a class="c-actLink" href="#" onclick="getOverlapMeeting('1101','qry','20261013');">查詢</a></td><td></td></tr>
+  <tr><td>00878 國泰永續高股息</td><td>115/10/20 115/10/01~115/10/17</td><td>未投票</td>
+      <td><a class="c-actLink" href="#" onclick="getOverlapMeeting('00878','vote','20261020');">投票</a></td><td></td></tr>
+  <tr><td>1909 榮成</td><td>115/10/01 115/09/16~115/09/28</td><td>已投票</td>
+      <td><a class="c-actLink" href="#" onclick="getOverlapMeeting('1909','qry','20261001');">查詢</a>
+          <a class="c-actLink" href="#" onclick="getOverlapMeeting('1909','modify','20261001');">修改</a>
+          <a class="c-actLink" href="#" onclick="getOverlapMeeting('1909','repael','20261001');">撤銷</a></td><td></td></tr>
+</table>
+<table id="tbDisplayTag"><tr><th>共計3筆 頁次：1/1</th></tr></table>
+<a href="MeetingList_XXXX_20260930.csv">下載持有股東會清單</a>
+<script>
+function getOverlapMeeting(code, action, date) {
+  if (action === 'vote') { location.href = '../001/1_03.html?c=' + code; }
+  else { document.title = 'FIXTURE 不該被點到:' + action; }
+}
+function sortList(k){ document.title = 'FIXTURE sort ' + k; }
+</script>
+</body></html>

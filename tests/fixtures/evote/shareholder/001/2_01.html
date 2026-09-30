@@ -1,0 +1,18 @@
+<!doctype html><html lang="zh-TW"><head><meta charset="utf-8">
+<title>FIXTURE 確認頁</title></head><body>
+<table class="o-table c-votelist_userInfo"><tr><th>戶名：</th><td>測試用</td></tr></table>
+<table class="o-table--card c-cardTable">
+  <tr><th>１： 討論事項</th></tr>
+  <tr><td>１： 測試議案內容</td><td>贊成</td></tr>
+</table>
+<textarea id="g-recaptcha-response-100000" name="g-recaptcha-response" style="display:none"></textarea>
+<button name="button" onclick="voteObj.checkMeetingPartner(); return false;">確認投票結果</button>
+<button name="button2" onclick="modifyVote(); return false;">修改投票結果</button>
+<button name="button" onclick="showConfirmDialog('...',giveUpVote); return false;">取消投票</button>
+<script>
+var voteObj = { checkMeetingPartner: function(){ location.href = '6_01.html'; }};
+function modifyVote(){ document.title = 'FIXTURE 災難:程式按到修改'; }
+function giveUpVote(){ document.title = 'FIXTURE 災難:程式按到取消投票'; }
+function showConfirmDialog(m,f){ f(); }
+</script>
+</body></html>

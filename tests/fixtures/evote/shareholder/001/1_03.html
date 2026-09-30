@@ -1,0 +1,33 @@
+<!doctype html><html lang="zh-TW"><head><meta charset="utf-8">
+<title>FIXTURE 議案頁</title></head><body>
+<table class="o-table c-votelist_userInfo"><tr><th>戶名：</th><td>測試用</td></tr></table>
+<table class="o-table c-votelist_docSection"><tr><th>會議日期 : 115/10/13</th></tr>
+<tr><td><a id="meetingData" href="#">瀏覽議事及開會通知書</a></td>
+    <td><a href="#" onclick="optionAll(0); return false;">全部贊成(承認)</a>｜
+        <a href="#" onclick="optionAll(1); return false;">全部反對</a>｜
+        <a href="#" onclick="optionAll(2); return false;">全部棄權</a></td></tr></table>
+<table class="o-table--card c-cardTable">
+  <tr><th>議案</th><th>行使表決權</th></tr>
+  <tr><td>１：討論事項</td><td>
+    <input type="radio" id="R1" name="20261013110101D" value="A"><label for="R1">贊成</label>
+    <input type="radio" id="R2" name="20261013110101D" value="O"><label for="R2">反對</label>
+    <input type="radio" id="R3" name="20261013110101D" value="C"><label for="R3">棄權</label>
+  </td></tr>
+</table>
+<table class="o-table c-votelist_docSection"><tr><td>
+  <a href="#" onclick="optionAll(0); return false;">全部贊成(承認)</a>｜
+  <a href="#" onclick="optionAll(1); return false;">全部反對</a>｜
+  <a href="#" onclick="optionAll(2); return false;">全部棄權</a></td></tr></table>
+<button class="o-button" onclick="voteObj.checkVote(); return false;">下一步</button>
+<button class="o-button" onclick="showConfirmDialog('...',giveUpVote); return false;">取消投票</button>
+<script>
+function optionAll(n){ document.getElementById(['R1','R2','R3'][n]).checked = true; }
+var voteObj = { checkVote: function(){
+  var picked = document.querySelector('input[name="20261013110101D"]:checked');
+  if (!picked) { document.title = 'FIXTURE 錯誤:沒選就按下一步'; return; }
+  location.href = '2_01.html?v=' + picked.value;
+}};
+function giveUpVote(){ document.title = 'FIXTURE 災難:程式按到取消投票'; }
+function showConfirmDialog(msg, fn){ fn(); }
+</script>
+</body></html>
