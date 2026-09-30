@@ -2,48 +2,111 @@
 #
 # ⚠️ 平台改版時，原則上「只需要改這一個檔」，程式碼不用動。
 #
-# 每一項都標了來源：
-#   [已驗證] = 2026-08-19 實際抓取未登入的靜態 HTML 確認過（見 docs/PLAN.md 事實表）
-#   [待填]   = 需要登入後才看得到，請跑「1_偵查頁面結構.bat」用真實頁面填進來
+# 來源標記：
+#   [已驗證] = 實際頁面抓取確認過（登入頁 2026-08-19；登入後各頁 2026-09-30）
+#   [待驗證] = 只見過單一情境，換情境可能不同（例如多議案、多筆重疊會議）
 #
-# 規則：不准憑空猜。填不出來就留 TODO，不要寫一個「看起來合理」的選擇器。
+# ⛔⛔ 最重要的兩個陷阱，動手改之前一定要看 ⛔⛔
+#
+# 陷阱 1：確認頁的「確認投票結果」和「取消投票」都是 button[name="button"]。
+#         只用 name 定位會有機會按到「取消投票」，把使用者填好的票丟掉。
+#         → 一律用 onclick 內的函式名定位，不要用 name。
+#
+# 陷阱 2：議案頁的「下一步」和「取消投票」都是 button.o-button。同上，用 onclick。
 
 login:
   # [已驗證] 股東登入頁
   url: "https://stockservices.tdcc.com.tw/evote/login/shareholder.html"
+  id_input: 'input[name="pageIdNo"]'          # [已驗證] 身分證／統編（maxlength=18）
+  password_input: 'input[name="pageUserPwd"]' # [已驗證] 密碼（maxlength=12）
+  logged_in_url_contains: "/evote/shareholder/"  # [已驗證] 登入後網址進入這個路徑
 
-  # [已驗證] 身分證／統編欄位（maxlength=18）
-  id_input: 'input[name="pageIdNo"]'
-
-  # [已驗證] 密碼欄位（maxlength=12）
-  password_input: 'input[name="pageUserPwd"]'
-
-  # [已驗證] 登入成功後網址會進入 /evote/shareholder/ 底下
-  # （例：/evote/shareholder/000/tc_estock_welshas_tmp.html、/evote/shareholder/109/emeeting.html）
-  # 本程式用「網址是否進入這個路徑」判斷你登入好了沒。
-  logged_in_url_contains: "/evote/shareholder/"
-
-# ── 以下全部待填：登入後的頁面目前沒有任何真實 DOM ──────────────────
+# ── 步驟 1：可投票股東會清單 ────────────────────────────────────
 meetings:
-  # [待填] 「可投票股東會清單」的入口連結
-  entry_link: null
-  # [待填] 清單每一列
-  row: null
-  # [待填] 列內的股票代號 / 公司名稱 / 開會日期 / 投票狀態 / 進入投票的按鈕
-  row_stock_code: null
-  row_company: null
-  row_meeting_date: null
-  row_status: null
-  row_vote_button: null
+  # [已驗證] 清單頁（選單上叫「投票作業」）
+  url: "https://stockservices.tdcc.com.tw/evote/shareholder/000/tc_estock_welshas.html"
+  url_contains: "/evote/shareholder/000/tc_estock_welshas"
 
+  table: "#stockInfo"          # [已驗證] 欄位：證券代號公司簡稱／會議日期投票起迄日／
+                               #          投票狀況／作業項目／eGift 資格
+  row: "#stockInfo tr"         # [已驗證] 第 0 列是表頭
+  page_info: "#tbDisplayTag"   # [已驗證] 「共計N筆 頁次：1/1」
+
+  # [已驗證] 作業項目那一欄的連結。動作與參數全在 onclick 裡：
+  #   getOverlapMeeting('<證券代號>','<動作>','<會議日期YYYYMMDD>')
+  #   動作：vote=投票 / qry=查詢 / modify=修改 / repael=撤銷（平台自己拼錯，照抄）
+  # ⚠️ 只點 vote。modify 會改掉已投的票，repael 會撤銷，都不可誤觸。
+  action_link: "a.c-actLink"
+  action_onclick_re: "getOverlapMeeting\\('([^']*)','([^']*)','([^']*)'\\)"
+  action_vote: "vote"
+
+  # [已驗證] 篩選用的連結（onclick）
+  filter_not_voted: "sortList('nVote')"
+  filter_voted: "sortList('yVote')"
+  filter_ended: "sortList('endVote')"
+  query_by_stock_input: 'input[name="qryStockId"]'
+
+  # [已驗證] 平台自己就提供清單 CSV，檔名形如 MeetingList_<識別碼>_<日期>.csv
+  # 不必自己爬表格解析——優先用這個。
+  csv_download_link: 'a[href$=".csv"]'
+
+# ── 步驟 2：議案頁（填選表決權）────────────────────────────────
 vote:
-  # [待填] 議案區塊、贊成/反對/棄權選項、全選按鈕（若平台有的話）
-  proposal_block: null
-  choice_agree: null
-  choice_disagree: null
-  choice_abstain: null
-  select_all_agree: null
-  # [待填] 送出 / 確認 / 完成
-  submit_button: null
-  confirm_button: null
-  done_marker: null
+  url_contains: "/evote/shareholder/001/1_03.html"   # [已驗證]
+
+  # [已驗證] 平台內建的一鍵全選（這是本專案採用的方式）
+  #   optionAll(0)=全部贊成(承認) / optionAll(1)=全部反對 / optionAll(2)=全部棄權
+  # 為什麼用它而不是逐個點 radio：radio 的 name 是動態組出來的
+  # （形如 <會議日期><證券代號><序號><類別>，例 ...110101D），
+  # id 也會隨議案數量變多（R1/R2/R3、R4/R5/R6...）。用平台自己的全選按鈕
+  # 可以完全避開這層猜測，而且使用者已拍板「先一律贊成」。
+  select_all_agree: "a[onclick*='optionAll(0)']"
+  select_all_against: "a[onclick*='optionAll(1)']"
+  select_all_abstain: "a[onclick*='optionAll(2)']"
+
+  # [待驗證] 單議案時是 R1/R2/R3（A=贊成 O=反對 C=棄權）。
+  # 多議案的編號規則沒驗證過，所以逐案投票尚未支援。
+  radio_agree_value: "A"
+  radio_against_value: "O"
+  radio_abstain_value: "C"
+
+  # [已驗證] ⚠️ 用 onclick 定位，不要用 button.o-button（會撞到取消投票）
+  next_button: "button[onclick*='checkVote']"
+  cancel_button: "button[onclick*='giveUpVote']"   # 記錄下來是為了「避免點到」
+
+  meeting_doc_link: "#meetingData"   # [已驗證] 議事手冊／紀念品資訊（公開資訊觀測站）
+
+# ── 步驟 3：確認頁（⛔ 程式不准按送出）──────────────────────────
+confirm:
+  url_contains: "/evote/shareholder/001/2_01.html"   # [已驗證]
+
+  # [已驗證] 這一頁掛了 invisible reCAPTCHA Enterprise：
+  #   - hidden textarea: #g-recaptcha-response-100000（name=g-recaptcha-response）
+  #   - iframe: google.com/recaptcha/enterprise/anchor?...&size=invisible
+  #   同一個 sitekey 也用在登入頁。
+  # ⛔ 因此「確認投票結果」這一鈕由**使用者本人**按，程式只負責停在這裡並提示。
+  #    不偽裝指紋、不接代解服務——詳見 docs/PLAN.md 第九節。
+  recaptcha_response: 'textarea[name="g-recaptcha-response"]'
+  recaptcha_iframe: 'iframe[src*="recaptcha/enterprise/anchor"]'
+
+  # [已驗證] ⚠️ 用 onclick 定位：本頁「確認投票結果」與「取消投票」name 都是 "button"
+  submit_button: "button[onclick*='checkMeetingPartner']"   # 僅用於偵測與提示，不點
+  modify_button: "button[onclick*='modifyVote']"
+  cancel_button: "button[onclick*='giveUpVote']"
+
+  summary_table: "table.o-table--card.c-cardTable"  # [已驗證] 議案 + 我方選擇（贊成…）
+  signing_marker: "table.bg2"                       # [已驗證] 送出後出現「憑證簽章中... 請稍候」
+
+# ── 步驟 4：完成頁 ───────────────────────────────────────────
+done:
+  url_contains: "/evote/shareholder/001/6_01.html"  # [已驗證]
+  result_table: "table.o-table.c-sysMsg_table"      # [已驗證] 作業項目／處理結果
+  success_text: "投票已完成"                          # [已驗證] 處理結果欄的字串
+  ack_button: "#go"                                  # [已驗證] 「確認」→ doProcess()
+
+# ── 已投票結果的查詢／列印頁 ────────────────────────────────────
+receipt:
+  url_contains: "/evote/shareholder/002/01.html"   # [已驗證]
+  print_button: "#printPage"
+  back_button: "button[onclick*='back()']"
+  summary_table: "table.o-table--card.c-cardTable"

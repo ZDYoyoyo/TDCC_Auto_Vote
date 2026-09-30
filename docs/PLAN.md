@@ -202,6 +202,97 @@ TDCC_Auto_Vote/
 
 ---
 
+## 十、真實流程已釘死（2026-09-30，使用者實抓登入後頁面）
+
+使用者跑 `explore` 抓回 8 份 `structure.md`，涵蓋完整投票流程。以下全部是
+**實際頁面**得到的，不是推測。
+
+### 流程與網址
+
+```
+① 清單頁  /evote/shareholder/000/tc_estock_welshas.html
+   表格 #stockInfo：證券代號公司簡稱 / 會議日期投票起迄日 / 投票狀況 /
+                    作業項目 / eGift資格
+   作業項目連結 a.c-actLink，參數全在 onclick：
+     getOverlapMeeting('<代號>','<動作>','<會議日期>')
+     動作 vote=投票 qry=查詢 modify=修改 repael=撤銷（平台自己拼錯）
+   篩選：sortList('nVote'/'yVote'/'endVote')
+   另有「下載持有股東會清單」CSV 連結
+        ↓ 點 vote
+② 議案頁  /evote/shareholder/001/1_03.html
+   一鍵全選：optionAll(0)=全部贊成(承認) / (1)=全部反對 / (2)=全部棄權
+   逐案 radio：#R1=A贊成 #R2=O反對 #R3=C棄權
+               name 是動態組的（<會議日期><代號><序號><類別>）
+   「下一步」= button[onclick*='checkVote']
+        ↓
+③ 確認頁  /evote/shareholder/001/2_01.html   ⛔ 反機器人在這裡
+   invisible reCAPTCHA Enterprise：
+     hidden textarea #g-recaptcha-response-100000
+     iframe google.com/recaptcha/enterprise/anchor?...&size=invisible
+     （sitekey 與登入頁同一個）
+   「確認投票結果」= button[onclick*='checkMeetingPartner']
+   按下後出現 table.bg2「憑證簽章中... 請稍候」
+        ↓
+④ 完成頁  /evote/shareholder/001/6_01.html
+   table.o-table.c-sysMsg_table → 處理結果「投票已完成！」
+   「確認」= #go
+
+（已投票的查詢／列印頁：/evote/shareholder/002/01.html，有 #printPage）
+```
+
+### 結論：第九節的假設 A 成立
+
+確認頁**確實掛了 invisible reCAPTCHA Enterprise**。所以「機器人驗證失敗」是
+反機器人檢查擋的，**程式不能代按「確認投票結果」**。
+
+但假設 B 也可能同時成立：reCAPTCHA token 有時效（iframe 參數 `execute-ms=30000`），
+使用者當時在議案頁停留了一陣子。兩者不互斥。
+
+### 好消息：reCAPTCHA 只在確認頁
+
+①②④ 都沒有 reCAPTCHA。所以半自動設計是**可行**的，而且分工很乾淨：
+
+| 步驟 | 誰做 |
+|---|---|
+| ① 讀清單、篩出未投票、逐檔點進去 | 程式 |
+| ② 按「全部贊成」、按「下一步」 | 程式 |
+| ③ 按「確認投票結果」 | **使用者本人**（一下） |
+| ④ 偵測完成、截圖、命名歸檔、回清單跑下一檔 | 程式 |
+
+而且這樣**反而比全程手動更不容易遇到「機器人驗證失敗」**：程式幾秒內把前面
+做完，使用者一到確認頁馬上按，token 是新鮮的。
+
+### 修正先前記錄錯的一件事
+
+先前 `CLAUDE.md` 記著「使用者回報平台看起來沒有一鍵投票」。**實際上單檔內有**
+`optionAll(0)`「全部贊成(承認)」。沒有的是「跨多檔一次全投」。
+
+這降低了程式在議案頁的價值（只省一次點擊），必須誠實計入效益評估。
+
+### ⛔ 兩個會造成災難的撞名陷阱（已寫進 selectors.yaml 檔頭）
+
+1. 確認頁的「確認投票結果」與「取消投票」**都是 `button[name="button"]`**。
+   用 name 定位會有機會按到取消，把填好的票丟掉。
+2. 議案頁的「下一步」與「取消投票」**都是 `button.o-button`**。同上。
+
+→ 一律用 `onclick` 內的函式名定位（`checkMeetingPartner` / `checkVote` /
+  `giveUpVote`），不要用 name 或 class。
+
+### 為什麼採「平台的全部贊成鈕」而不是逐個點 radio
+
+radio 的 `name` 是動態組出來的（形如 `<會議日期><代號><序號><類別>`），`id` 也會
+隨議案數量增加（R1/R2/R3、R4/R5/R6…）。多議案的編號規則**沒有驗證過**。
+用平台自己的全選按鈕可以完全避開這層猜測，也符合使用者已拍板的「先一律贊成」。
+逐案自訂投票要等拿到多議案的真實頁面才能做。
+
+### ⚠️ 個資警告
+
+`explore` 產出的 `structure.md` 裡含**戶名與戶號**（表格 `c-votelist_userInfo`），
+CSV 檔名也含識別碼。這些**不可以進 repo**，本專案只把「選擇器」寫進
+`config/selectors.yaml`。
+
+---
+
 ## ⚠️ 服務條款
 
 集保股東 e 服務是官方系統、操作的是你**本人**的股東帳戶。自動化操作是否違反其
