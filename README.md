@@ -22,7 +22,10 @@
 
 雙擊 **`1_偵查頁面結構.bat`**，然後：
 
-1. 程式會跳出一個瀏覽器視窗，**你自己在裡面登入**（身分證、密碼，或憑證）
+1. 程式會跳出一個瀏覽器視窗並停在登入頁，**你自己在裡面登入**（身分證、密碼，或憑證）
+
+   > 黑色視窗的 `按 Enter 抓取目前頁面` 提示會**馬上出現**，程式不會自己等、
+   > 也不會自己動。你慢慢登入，登好再回來按 Enter 就行。
 2. 登入好之後，在瀏覽器裡點到你想分析的頁面
    （例如「可投票的股東會清單」、某一檔的「議案頁」）
 3. 回到黑色視窗按 **Enter**，它就會把那一頁存下來
@@ -93,7 +96,7 @@ PYTHONPATH=src python -m tdcc_vote.explore --help
 | `config/selectors.yaml` | 網站元素定位表。**平台改版原則上只改這一個檔** |
 | `src/tdcc_vote/paths.py` | 時間／檔名工具。⚠️ 時區一律 `Asia/Taipei`，不要自己 `datetime.now()` |
 | `src/tdcc_vote/browser.py` | 有頭 + 持久化 profile 的瀏覽器啟動（不做任何指紋偽裝） |
-| `src/tdcc_vote/login_gate.py` | 停下來等人工登入，靠網址進入 `/evote/shareholder/` 判定成功 |
+| `src/tdcc_vote/login_gate.py` | 開啟登入頁、判定登入狀態（靠網址是否進入 `/evote/shareholder/`）。**不做阻塞等待** |
 | `src/tdcc_vote/explore.py` | 偵查工具 |
 
 ⚠️ **`.bat` 檔內容一律只用 ASCII（連 `REM` 註解也是）**。cmd 解析 .bat 用的是系統

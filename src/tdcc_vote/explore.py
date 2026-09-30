@@ -5,10 +5,12 @@
 所以第一步是先把真東西抓下來，再據以填 config/selectors.yaml。
 
 用法（Windows 雙擊 1_偵查頁面結構.bat 即可）：
-  1. 程式開瀏覽器 → 你自己登入
+  1. 程式開瀏覽器並停在登入頁 → 你自己登入
   2. 你在瀏覽器裡點到想分析的頁面（例：可投票股東會清單、某一檔的議案頁）
   3. 回到這個黑色視窗按 Enter → 它把當前頁面存下來
   4. 重複 2-3，全部抓完輸入 q 結束
+
+程式不會自己等、也不會自己動；提示一出現就可以按 Enter。
 
 ⚠️ 產出的檔案含你的姓名、身分證、持股明細等個資，存在 explore/ 底下，
    已加入 .gitignore。不要外傳、不要貼到公開的地方。
@@ -24,7 +26,7 @@ from playwright.sync_api import Page, sync_playwright
 
 from .browser import DEFAULT_PROFILE, launch
 from .config import load_selectors
-from .login_gate import wait_for_login
+from .login_gate import is_logged_in, open_login_page
 from .paths import PROJECT_ROOT, safe_name, stamp
 
 DEFAULT_OUT = PROJECT_ROOT / "explore"
@@ -188,7 +190,6 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--profile", type=Path, default=DEFAULT_PROFILE, help="瀏覽器 profile 目錄")
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT, help="輸出目錄")
     ap.add_argument("--channel", default=None, help='用系統瀏覽器，例：--channel chrome')
-    ap.add_argument("--timeout", type=int, default=600, help="等待登入的秒數")
     ap.add_argument("--headless", action="store_true", help="無視窗模式（僅供測試，正常使用不要開）")
     args = ap.parse_args(argv)
 
@@ -203,30 +204,35 @@ def main(argv: list[str] | None = None) -> int:
         ctx = launch(pw, profile_dir=args.profile, channel=args.channel, headless=args.headless)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         try:
-            ok = wait_for_login(page, selectors, timeout_sec=args.timeout)
-            if not ok:
-                print("（沒偵測到登入，你還是可以繼續 dump 目前這個頁面）")
+            open_login_page(page, selectors)
 
             print()
             print("─" * 60)
-            print(" 操作方式：在瀏覽器點到想分析的頁面 → 回來這裡按 Enter")
-            print(" 全部抓完後，輸入 q 再按 Enter 結束")
+            print(" 接下來都由你控制，程式不會自己動：")
+            print("   1. 在瀏覽器裡登入")
+            print("   2. 點到想分析的頁面")
+            print("   3. 回到這個視窗按 Enter → 抓取那一頁")
+            print("   4. 重複 2-3；全部抓完輸入 q 再按 Enter 結束")
             print("─" * 60)
 
             seq = 0
             while True:
+                state = "已登入" if is_logged_in(page, selectors) else "還沒登入"
                 try:
-                    cmd = input("\n按 Enter 抓取目前頁面（q=結束）> ").strip().lower()
-                except EOFError:
+                    cmd = input(f"\n[{state}] 按 Enter 抓取目前頁面（q=結束）> ").strip().lower()
+                except (EOFError, KeyboardInterrupt):
+                    print()
                     break
                 if cmd in {"q", "quit", "exit"}:
                     break
-                seq += 1
                 try:
-                    dump(page, args.out, seq)
+                    dump(page, args.out, seq + 1)
+                    seq += 1
                 except Exception as exc:
                     print(f"❌ 抓取失敗：{exc}")
-                    seq -= 1
+                    if "closed" in str(exc).lower():
+                        print("   瀏覽器好像被關掉了，結束。")
+                        break
 
             print(f"\n完成，共抓取 {seq} 個頁面。")
             print(f"請把 {args.out} 裡的 structure.md 交給我，用來填 config/selectors.yaml。")
