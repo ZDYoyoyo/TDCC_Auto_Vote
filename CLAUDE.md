@@ -197,6 +197,14 @@ agent 會過度修正，把對的也改壞。
     Playwright 無法實連集保網站）。`config/selectors.yaml` 的 meetings／vote
     區段全是 `null`，等 P1 填。
 
-- **下次要做（P1）**：請使用者跑一次 `1_偵查頁面結構.bat`，把 `structure.md`
-  交回來 → 填 `config/selectors.yaml` → 寫 `meetings.py`／`vote.py`
-  （dry-run 預設不送出）。
+- **2026-09-30 新發現（重要，會改變範圍）**
+  - 修掉 `explore` 的阻塞式登入等待：原本輪詢 600 秒不讀 stdin，
+    使用者按 Enter／q 完全沒反應。**不要再加回任何「等待登入完成」的阻塞迴圈。**
+  - ⛔ 使用者實測：在程式開的瀏覽器裡**登入成功**，但按「投票確認」時顯示
+    **「機器人驗證失敗」**。兩種假設（投票送出也有反機器人檢查／token 逾時）
+    尚未分辨，**不要在沒看到議案頁 HTML 前就選一邊改設計**。
+    詳見 `docs/PLAN.md` 第九節。
+
+- **下次要做（P1）**：請使用者跑一次 `1_偵查頁面結構.bat`，抓**議案頁**與
+  **「機器人驗證失敗」那一頁** → 檢查 HTML 裡有無 `grecaptcha` 以分辨上述假設
+  → 再決定 `vote.py` 能不能代按送出 → 填 `config/selectors.yaml`。
