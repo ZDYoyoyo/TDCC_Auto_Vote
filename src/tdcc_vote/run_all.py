@@ -180,6 +180,8 @@ def main(argv: list[str] | None = None) -> int:
                 records.append(rec)
                 evidence.record(rec)
         finally:
+            # 使用者第一次實跑時，看到瀏覽器突然關掉不確定是否正常。先講。
+            print("\n（程式結束，瀏覽器會自動關閉。結果以下方總結與截圖為準。）")
             ctx.close()
 
     path = evidence.RESULTS_DIR / f"{evidence.today()}.jsonl"
