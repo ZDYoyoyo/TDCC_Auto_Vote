@@ -1,5 +1,12 @@
 <!doctype html><html lang="zh-TW"><head><meta charset="utf-8">
 <title>FIXTURE 清單頁</title></head><body>
+<script>
+// 重現真站行為：這一頁會自己重導成 ?top=1（跳脫框架的腳本），
+// 使得 page.goto 丟出 "interrupted by another navigation"。
+if (location.search.indexOf('top=1') === -1) {
+  location.replace(location.pathname + '?top=1');
+}
+</script>
 <h1>投票作業</h1>
 <table id="stockInfo">
   <tr><th>證券代號公司簡稱</th><th>會議日期投票起迄日</th><th>投票狀況</th><th>作業項目</th><th>符合eGift發放資格</th></tr>

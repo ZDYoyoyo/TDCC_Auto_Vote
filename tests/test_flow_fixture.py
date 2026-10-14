@@ -21,7 +21,7 @@ import tempfile  # noqa: E402
 import yaml  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
-from tdcc_vote import evidence  # noqa: E402
+from tdcc_vote import evidence, nav  # noqa: E402
 from tdcc_vote.login_gate import is_logged_in, pick_page  # noqa: E402
 from tdcc_vote.meetings import read_meetings, votable  # noqa: E402
 from tdcc_vote.vote import vote_one  # noqa: E402
@@ -57,7 +57,7 @@ def main() -> int:
             executable_path=os.environ.get("TDCC_CHROMIUM_PATH") or None,
         )
         page = browser.new_page()
-        page.goto(LIST_URL, wait_until="domcontentloaded")
+        nav.goto(page, LIST_URL, expect_contains="tc_estock_welshas")
 
         print("\n[1] 讀清單與解析")
         ms = read_meetings(page, sel)
@@ -92,7 +92,7 @@ def main() -> int:
               page.title())
 
         print("\n[5] 真投票路徑（confirm=True，fixture 自動代替使用者按確認）")
-        page.goto(LIST_URL, wait_until="domcontentloaded")
+        nav.goto(page, LIST_URL, expect_contains="tc_estock_welshas")
         ms2 = read_meetings(page, sel)
         target = {m.stock_code: m for m in ms2}["00878"]
         # 用 monkeypatch 模擬使用者「按完確認、回來按 Enter」
@@ -120,7 +120,7 @@ def main() -> int:
         tab_login = ctx2.new_page()
         tab_login.goto(LOGIN_URL, wait_until="domcontentloaded")
         tab_list = ctx2.new_page()
-        tab_list.goto(LIST_URL + "?top=1", wait_until="domcontentloaded")
+        nav.goto(tab_list, LIST_URL + "?top=1", expect_contains="tc_estock_welshas")
 
         check("第一個分頁確實是登入頁（未登入）", not is_logged_in(tab_login, sel),
               tab_login.url.rsplit("/", 1)[-1])
@@ -129,6 +129,69 @@ def main() -> int:
               picked.url == tab_list.url, picked.url.rsplit("/", 1)[-1])
         check("挑到的分頁判定為已登入", is_logged_in(picked, sel))
         ctx2.close()
+
+        print("\n[7] 真站會自我重導成 ?top=1：nav.goto 要撐住，但不能吞掉真錯誤")
+        ctx3 = browser.new_context()
+        t4 = ctx3.new_page()
+        ok = True
+        try:
+            nav.goto(t4, LIST_URL, expect_contains="tc_estock_welshas")
+        except Exception as exc:
+            ok = False
+            print(f"      nav.goto 失敗：{exc}")
+        check("nav.goto 導到會自我重導的頁面仍成功", ok)
+        check("最後落在 ?top=1 的頁面", "top=1" in t4.url, t4.url.rsplit("/", 1)[-1])
+        check("到站後表格讀得到", len(read_meetings(t4, sel)) == 3)
+        ctx3.close()
+
+        # ⚠️ 誠實說明：fixture 的 location.replace 發生得太早，Playwright 會把它
+        #    算進同一次導航，所以**沒有重現**使用者遇到的那個競態例外。
+        #    因此改成直接測 nav.goto 的契約：用假的 page 物件餵進真實的錯誤訊息。
+        print("      （以下用假 page 物件直接測 nav.goto 的處理邏輯）")
+
+        REAL_ERR = ('Page.goto: Navigation to "https://x/000/tc_estock_welshas.html" '
+                    'is interrupted by another navigation to '
+                    '"https://x/000/tc_estock_welshas.html?top=1"')
+
+        class FakePage:
+            def __init__(self, err, final_url):
+                self._err, self.url = err, final_url
+            def goto(self, *a, **k):
+                if self._err:
+                    raise RuntimeError(self._err)
+            def wait_for_load_state(self, *a, **k):
+                pass
+            def wait_for_url(self, pred, **k):
+                if not pred(self.url):
+                    raise RuntimeError("timeout")
+
+        # (a) 遇到自我重導的例外，但最後在正確頁面 → 應視為成功
+        swallowed = True
+        try:
+            nav.goto(FakePage(REAL_ERR, "https://x/000/tc_estock_welshas.html?top=1"),
+                     "https://x/", expect_contains="tc_estock_welshas")
+        except Exception as exc:
+            swallowed = False
+            print(f"      不該丟卻丟了：{exc}")
+        check("自我重導例外 + 落在正確頁面 → 當成成功", swallowed)
+
+        # (b) 不是自我重導的錯誤 → 必須原封不動丟出去，不可被吞掉
+        passed_through = False
+        try:
+            nav.goto(FakePage("net::ERR_CONNECTION_RESET", "https://x/"),
+                     "https://x/", expect_contains="tc_estock_welshas")
+        except Exception as exc:
+            passed_through = "ERR_CONNECTION_RESET" in str(exc)
+        check("真正的連線錯誤不會被吞掉", passed_through)
+
+        # (c) 容忍了例外，但最後落在錯的頁面（例如被踢回登入頁）→ 必須報錯
+        reported = False
+        try:
+            nav.goto(FakePage(REAL_ERR, "https://x/evote/login/shareholder.html"),
+                     "https://x/", expect_contains="tc_estock_welshas")
+        except RuntimeError as exc:
+            reported = "不在預期的頁面" in str(exc)
+        check("容忍重導但落在錯頁面 → 仍然報錯", reported)
 
         browser.close()
 

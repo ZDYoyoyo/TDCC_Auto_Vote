@@ -15,7 +15,7 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-from . import evidence
+from . import evidence, nav
 from .browser import DEFAULT_PROFILE, launch
 from .config import load_selectors
 from .login_gate import list_tabs, open_login_page, pick_page
@@ -94,12 +94,18 @@ def main(argv: list[str] | None = None) -> int:
 
             # 不靠網址猜有沒有登入，直接去清單頁看能不能到。
             # 能到就是有登入；被踢回登入頁就是沒有。
+            # ⚠️ 用 nav.goto 而不是 page.goto：這一頁會自己重導成 ?top=1，
+            #    page.goto 會丟「interrupted by another navigation」。實際踩過。
             print(f"→ 前往清單頁：{selectors['meetings']['url']}")
             try:
-                page.goto(selectors["meetings"]["url"], wait_until="domcontentloaded",
-                          timeout=60000)
+                nav.goto(page, selectors["meetings"]["url"],
+                         expect_contains=selectors["meetings"]["url_contains"])
             except Exception as exc:
                 print(f"⚠️ 開清單頁失敗：{exc}")
+                print(f"   程式目前看到的網址：{page.url}")
+                print("   程式開的所有分頁：")
+                for u in list_tabs(ctx):
+                    print(f"     - {u}")
                 return 1
 
             if "/login/" in page.url or "/evote/shareholder/" not in page.url:

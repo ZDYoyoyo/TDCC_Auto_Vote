@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from playwright.sync_api import Page
 
-from . import evidence
+from . import evidence, nav
 from .evidence import VoteRecord
 from .meetings import ACTION_VOTE, Meeting
 
@@ -39,11 +39,14 @@ def _wait_url(page: Page, fragment: str, timeout: int = NAV_TIMEOUT) -> None:
 
 
 def _back_to_list(page: Page, selectors: dict) -> None:
-    """回清單頁。刻意用 goto 而不是點「取消投票」——那顆鈕會跳確認框、
-    而且語意是放棄，不該由程式代按。"""
+    """回清單頁。刻意用導頁而不是點「取消投票」——那顆鈕會跳確認框、
+    而且語意是放棄，不該由程式代按。
+
+    用 nav.goto 而不是 page.goto：清單頁會自己重導成 ?top=1。"""
     try:
-        page.goto(selectors["meetings"]["url"], wait_until="domcontentloaded",
-                  timeout=NAV_TIMEOUT)
+        nav.goto(page, selectors["meetings"]["url"],
+                 expect_contains=selectors["meetings"]["url_contains"],
+                 timeout=NAV_TIMEOUT)
     except Exception as exc:
         print(f"   ⚠️ 回清單頁失敗：{exc}")
 
