@@ -22,6 +22,7 @@ import yaml  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 from tdcc_vote import evidence  # noqa: E402
+from tdcc_vote.login_gate import is_logged_in, pick_page  # noqa: E402
 from tdcc_vote.meetings import read_meetings, votable  # noqa: E402
 from tdcc_vote.vote import vote_one  # noqa: E402
 
@@ -33,6 +34,7 @@ evidence.RESULTS_DIR = _TMP / 'logs'
 
 FIXTURES = ROOT / "tests" / "fixtures"
 LIST_URL = (FIXTURES / "evote/shareholder/000/tc_estock_welshas.html").as_uri()
+LOGIN_URL = (FIXTURES / "evote/login/shareholder.html").as_uri()
 
 failures: list[str] = []
 
@@ -111,6 +113,22 @@ def main() -> int:
         check("有等使用者按確認（沒有程式自己按送出）", calls["n"] == 1, f"{calls['n']} 次")
         check("完成後回到清單頁", "tc_estock_welshas" in page.url, page.url.rsplit("/", 1)[-1])
         check("這一輪也沒觸發取消／修改", "災難" not in page.title(), page.title())
+
+        print("\n[6] 多分頁：登入後平台另開頁，不可寫死第一個分頁")
+        # 重現實際 bug：pages[0] 停在登入頁，使用者其實在另一個分頁
+        ctx2 = browser.new_context()
+        tab_login = ctx2.new_page()
+        tab_login.goto(LOGIN_URL, wait_until="domcontentloaded")
+        tab_list = ctx2.new_page()
+        tab_list.goto(LIST_URL + "?top=1", wait_until="domcontentloaded")
+
+        check("第一個分頁確實是登入頁（未登入）", not is_logged_in(tab_login, sel),
+              tab_login.url.rsplit("/", 1)[-1])
+        picked = pick_page(ctx2, sel)
+        check("pick_page 挑到已登入的那個分頁，不是 pages[0]",
+              picked.url == tab_list.url, picked.url.rsplit("/", 1)[-1])
+        check("挑到的分頁判定為已登入", is_logged_in(picked, sel))
+        ctx2.close()
 
         browser.close()
 

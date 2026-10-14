@@ -38,3 +38,37 @@ def open_login_page(page: Page, selectors: dict) -> None:
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
     except Exception as exc:
         print(f"⚠️ 開啟登入頁失敗（你可以自己在瀏覽器輸入網址）：{exc}")
+
+def list_tabs(ctx) -> list[str]:
+    """目前所有分頁的網址（診斷用）。"""
+    urls = []
+    for pg in ctx.pages:
+        try:
+            urls.append(pg.url)
+        except Exception:
+            urls.append("(已關閉)")
+    return urls
+
+
+def pick_page(ctx, selectors: dict):
+    """從 context 的所有分頁裡挑出「使用者實際在看的那一頁」。
+
+    ⚠️ 不可以寫死 ctx.pages[0]——實際踩過：集保登入後會另開頁
+    （網址帶 ?top=1），pages[0] 還停在登入頁，於是程式判定「還沒登入」，
+    但使用者明明已經登入了，訊息還叫他「請先登入」，完全對不上。
+
+    優先順序：已登入的分頁 > 最後一個非空白分頁 > 第一個分頁。
+    """
+    pages = [pg for pg in ctx.pages if pg]
+    if not pages:
+        return ctx.new_page()
+    for pg in reversed(pages):
+        if is_logged_in(pg, selectors):
+            return pg
+    for pg in reversed(pages):
+        try:
+            if pg.url and not pg.url.startswith("about:"):
+                return pg
+        except Exception:
+            continue
+    return pages[0]

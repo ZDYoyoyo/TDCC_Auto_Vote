@@ -18,7 +18,7 @@ from playwright.sync_api import sync_playwright
 from . import evidence
 from .browser import DEFAULT_PROFILE, launch
 from .config import load_selectors
-from .login_gate import is_logged_in, open_login_page
+from .login_gate import list_tabs, open_login_page, pick_page
 from .meetings import Meeting, read_meetings, votable
 from .vote import AbortAll, vote_one
 
@@ -77,22 +77,41 @@ def main(argv: list[str] | None = None) -> int:
     with sync_playwright() as pw:
         ctx = launch(pw, profile_dir=args.profile, channel=args.channel,
                      headless=args.headless)
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page = pick_page(ctx, selectors)
         try:
             open_login_page(page, selectors)
-            print("\n請在瀏覽器裡登入，登好之後回來這裡按 Enter（q=離開）")
+            print("\n請在**程式剛剛開的那個瀏覽器視窗**裡登入，"
+                  "登好之後回來這裡按 Enter（q=離開）")
             try:
                 if input("> ").strip().lower() == "q":
                     return 0
             except (EOFError, KeyboardInterrupt):
                 return 0
 
-            if not is_logged_in(page, selectors):
-                print("⚠️ 看起來還沒登入（網址沒進入 /evote/shareholder/）。"
-                      "請先登入好再重跑。")
+            # ⚠️ 登入後平台會另開頁（網址帶 ?top=1），所以要重新挑一次分頁，
+            #    不能繼續用原本那個 page 物件。實際踩過。
+            page = pick_page(ctx, selectors)
+
+            # 不靠網址猜有沒有登入，直接去清單頁看能不能到。
+            # 能到就是有登入；被踢回登入頁就是沒有。
+            print(f"→ 前往清單頁：{selectors['meetings']['url']}")
+            try:
+                page.goto(selectors["meetings"]["url"], wait_until="domcontentloaded",
+                          timeout=60000)
+            except Exception as exc:
+                print(f"⚠️ 開清單頁失敗：{exc}")
                 return 1
 
-            page.goto(selectors["meetings"]["url"], wait_until="domcontentloaded")
+            if "/login/" in page.url or "/evote/shareholder/" not in page.url:
+                print("\n⚠️ 到不了清單頁，看起來這個瀏覽器還沒登入。")
+                print(f"   程式目前看到的網址：{page.url}")
+                print("   程式開的所有分頁：")
+                for u in list_tabs(ctx):
+                    print(f"     - {u}")
+                print("\n   最常見的原因：你是在**自己平常用的瀏覽器**登入的。")
+                print("   請在程式剛剛跳出來的那個視窗裡登入，再重跑一次。")
+                return 1
+
             meetings = read_meetings(page, selectors)
             _print_list(meetings)
 

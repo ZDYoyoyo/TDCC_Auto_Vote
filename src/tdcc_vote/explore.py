@@ -26,7 +26,7 @@ from playwright.sync_api import Page, sync_playwright
 
 from .browser import DEFAULT_PROFILE, launch
 from .config import load_selectors
-from .login_gate import is_logged_in, open_login_page
+from .login_gate import is_logged_in, open_login_page, pick_page
 from .paths import PROJECT_ROOT, safe_name, stamp
 
 DEFAULT_OUT = PROJECT_ROOT / "explore"
@@ -202,7 +202,7 @@ def main(argv: list[str] | None = None) -> int:
 
     with sync_playwright() as pw:
         ctx = launch(pw, profile_dir=args.profile, channel=args.channel, headless=args.headless)
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page = pick_page(ctx, selectors)
         try:
             open_login_page(page, selectors)
 
@@ -217,9 +217,14 @@ def main(argv: list[str] | None = None) -> int:
 
             seq = 0
             while True:
+                # ⚠️ 每次都重新挑分頁：平台登入後會另開頁（網址帶 ?top=1），
+                #    寫死第一個分頁會抓到舊的登入頁。實際踩過。
+                page = pick_page(ctx, selectors)
                 state = "已登入" if is_logged_in(page, selectors) else "還沒登入"
+                short = page.url.rsplit("/", 1)[-1][:40] or page.url
                 try:
-                    cmd = input(f"\n[{state}] 按 Enter 抓取目前頁面（q=結束）> ").strip().lower()
+                    cmd = input(f"\n[{state}] 將抓取：{short}"
+                                f"\n按 Enter 抓取（q=結束）> ").strip().lower()
                 except (EOFError, KeyboardInterrupt):
                     print()
                     break
