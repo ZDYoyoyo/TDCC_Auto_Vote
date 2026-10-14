@@ -31,7 +31,7 @@ class VoteRecord:
     proposals: list[dict[str, str]] = field(default_factory=list)  # 當下看到的議案與選擇
     screenshots: list[str] = field(default_factory=list)
     receipt: str = ""         # 投票完成頁的截圖（另存在「投票完成」資料夾）
-    submitted_by: str = ""    # manual=使用者在確認頁按的 / ""=沒送出
+    submitted_by: str = ""    # auto=程式自動按的 / manual=使用者在確認頁按的 / ""=沒送出
     recorded_at: str = ""
 
     def __post_init__(self) -> None:

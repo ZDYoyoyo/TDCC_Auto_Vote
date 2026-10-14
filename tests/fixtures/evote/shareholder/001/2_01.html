@@ -10,7 +10,18 @@
 <button name="button2" onclick="modifyVote(); return false;">修改投票結果</button>
 <button name="button" onclick="showConfirmDialog('...',giveUpVote); return false;">取消投票</button>
 <script>
-var voteObj = { checkMeetingPartner: function(){ location.href = '6_01.html'; }};
+// 測試可設 window.__FAIL_BOT = true，模擬真站的隱形機器人驗證判定失敗：
+// 跳出 alert、停在原頁不前進（使用者 2026-09-30 實際遇過的訊息）。
+// 也可設 window.__FAIL_BOT_DOM = true：改成在頁面上顯示文字（不跳 alert），
+// 因為不確定真站是用哪一種方式顯示。
+var voteObj = { checkMeetingPartner: function(){
+  if (window.__FAIL_BOT) { alert('機器人驗證失敗'); return; }
+  if (window.__FAIL_BOT_DOM) {
+    document.body.insertAdjacentHTML('beforeend', '<div class="err">機器人驗證失敗</div>');
+    return;
+  }
+  location.href = '6_01.html';
+}};
 function modifyVote(){ document.title = 'FIXTURE 災難:程式按到修改'; }
 function giveUpVote(){ document.title = 'FIXTURE 災難:程式按到取消投票'; }
 function showConfirmDialog(m,f){ f(); }

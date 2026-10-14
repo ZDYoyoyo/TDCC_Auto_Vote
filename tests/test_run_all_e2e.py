@@ -40,7 +40,8 @@ def check(name: str, cond: bool, extra: str = "") -> None:
         failures.append(name)
 
 
-def run_main(list_url: str, answers: list[str], out: Path) -> int:
+def run_main(list_url: str, answers: list[str], out: Path,
+             extra_args: list[str] | None = None) -> int:
     sel = yaml.safe_load((ROOT / "config/selectors.yaml").read_text(encoding="utf-8"))
     sel["login"]["url"] = LOGIN
     sel["meetings"]["url"] = list_url
@@ -55,7 +56,7 @@ def run_main(list_url: str, answers: list[str], out: Path) -> int:
     real_input = builtins.input
     builtins.input = lambda prompt="": (print(prompt, end=""), queue.pop(0))[1]
     try:
-        return ra.main(["--headless", "--profile", str(out / "profile")])
+        return ra.main(["--headless", "--profile", str(out / "profile")] + (extra_args or []))
     finally:
         builtins.input = real_input
 
@@ -85,6 +86,23 @@ def main() -> int:
     dumps = list((tmp / "B" / "explore").glob("*/structure.md"))
     check("自動存下頁面供診斷", len(dumps) == 1, str(len(dumps)))
     check("沒有產生任何投票紀錄", not (tmp / "B" / "logs").exists())
+
+    print("\n[D] 真投模式（--confirm）：自動按確認，兩檔都投完、不需要使用者動手")
+    # 只排兩個答案（登入後 Enter、開始 Enter）。若程式退回手動而多要輸入，
+    # queue 會被 pop 空而丟例外，測試就會失敗——用來證明真的沒有打擾使用者。
+    code = run_main(TMP_ENTRY, ["", ""], tmp / "D", ["--confirm"])
+    check("main() 回傳 0", code == 0, str(code))
+    recs_d = []
+    for f in (tmp / "D" / "logs").glob("*.jsonl"):
+        recs_d += [json.loads(x) for x in f.read_text(encoding="utf-8").splitlines()]
+    check("兩檔都投成功", [r["status"] for r in recs_d] == ["OK", "OK"],
+          str([r["status"] for r in recs_d]))
+    check("兩檔都標明是程式自動送出", all(r["submitted_by"] == "auto" for r in recs_d),
+          str([r["submitted_by"] for r in recs_d]))
+    receipts = sorted(p.name for p in (tmp / "D" / "evidence" / "投票完成").glob("*.png"))
+    check("「投票完成」資料夾有兩張，各帶代號", len(receipts) == 2
+          and receipts[0].startswith("00878_") and receipts[1].startswith("1101_"),
+          str(receipts))
 
     print("\n[C] 污染檢查")
     for d in ("evidence", "logs", "explore", "profile"):

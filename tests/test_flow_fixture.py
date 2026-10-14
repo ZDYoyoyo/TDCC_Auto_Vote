@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pathlib
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -93,7 +94,7 @@ def main() -> int:
         check("全程沒觸發取消／修改", "災難" not in page.title() and "錯誤" not in page.title(),
               page.title())
 
-        print("\n[5] 真投票路徑（confirm=True，fixture 自動代替使用者按確認）")
+        print("\n[5] 真投票、關閉自動按（auto_submit=False）：由使用者手動按")
         nav.goto(page, LIST_URL, expect_contains="tc_estock_welshas")
         ms2 = read_meetings(page, sel)
         target = {m.stock_code: m for m in ms2}["00878"]
@@ -109,10 +110,10 @@ def main() -> int:
             return ""
 
         vote_mod._ask_confirmed = fake_ask
-        rec2 = vote_one(page, sel, target, confirm=True)
+        rec2 = vote_one(page, sel, target, confirm=True, auto_submit=False)
         check("狀態 OK", rec2.status == "OK", rec2.status + " / " + rec2.detail)
         check("完成頁驗到「投票已完成」", "投票已完成" in rec2.detail, rec2.detail[:60])
-        check("有等使用者按確認（沒有程式自己按送出）", calls["n"] == 1, f"{calls['n']} 次")
+        check("關閉自動按時，有等使用者按確認", calls["n"] == 1, f"{calls['n']} 次")
         check("完成後回到清單頁", "tc_estock_welshas" in page.url, page.url.rsplit("/", 1)[-1])
         check("這一輪也沒觸發取消／修改", "災難" not in page.title(), page.title())
         check("紀錄標明是使用者手動送出", rec2.submitted_by == "manual", rec2.submitted_by)
@@ -126,6 +127,82 @@ def main() -> int:
         check("預跑的那一檔沒有完成截圖", rec.receipt == "", rec.receipt or "（無，正確）")
         others = [p.name for p in evidence.receipt_dir().glob("*.png")]
         check("「投票完成」資料夾只有真的投完的那一張", len(others) == 1, str(others))
+
+        print("\n[10] 真投票、自動按成功（預設）：不需要使用者動手")
+        nav.goto(page, LIST_URL, expect_contains="tc_estock_welshas")
+        t10 = {m.stock_code: m for m in read_meetings(page, sel)}["1101"]
+        calls["n"] = 0
+        rec10 = vote_one(page, sel, t10, confirm=True)
+        check("狀態 OK", rec10.status == "OK", rec10.status + " / " + rec10.detail[:60])
+        check("紀錄標明是程式自動送出", rec10.submitted_by == "auto", rec10.submitted_by)
+        check("自動送出成功時，沒有打擾使用者", calls["n"] == 0, f"{calls['n']} 次")
+        check("總結文字寫明是程式自動送出", rec10.detail.startswith("程式自動送出"),
+              rec10.detail[:20])
+        check("完成截圖也存在「投票完成」資料夾",
+              bool(rec10.receipt) and Path(rec10.receipt).parent == evidence.receipt_dir())
+        check("自動送出這一輪沒觸發取消／修改", "災難" not in page.title(), page.title())
+
+        print("\n[11] 自動按被機器人驗證擋下 → 記下訊息、退回請使用者手動按")
+        nav.goto(page, LIST_URL, expect_contains="tc_estock_welshas")
+        t11 = {m.stock_code: m for m in read_meetings(page, sel)}["1101"]
+        page.add_init_script("window.__FAIL_BOT = true")   # 之後每一頁都會被判定為機器人
+        calls["n"] = 0
+
+        def fake_ask_after_block() -> str:
+            calls["n"] += 1
+            # 模擬使用者自己按：真人按的不會被擋，所以先關掉模擬開關再按
+            page.evaluate("window.__FAIL_BOT = false")
+            page.click(sel["confirm"]["submit_button"])
+            page.wait_for_url(lambda u: "6_01" in u, timeout=10000)
+            return ""
+
+        vote_mod._ask_confirmed = fake_ask_after_block
+        t_start = time.monotonic()
+        rec11 = vote_one(page, sel, t11, confirm=True)
+        elapsed11 = time.monotonic() - t_start
+        check("最後仍然投成功", rec11.status == "OK", rec11.status + " / " + rec11.detail[:60])
+        check("被擋之後有退回請使用者手動按", calls["n"] == 1, f"{calls['n']} 次")
+        check("紀錄標明最後是使用者手動送出", rec11.submitted_by == "manual", rec11.submitted_by)
+        blocked_shots = [s for s in rec11.screenshots if "自動送出被擋" in s]
+        check("被擋的畫面有截圖", len(blocked_shots) == 1, str(len(blocked_shots)))
+        check("被擋的那一張沒有進「投票完成」資料夾",
+              all(Path(s).parent != evidence.receipt_dir() for s in blocked_shots))
+        check("紀錄保留了網頁的「機器人驗證失敗」訊息（成功後也沒被蓋掉）",
+              "機器人驗證失敗" in rec11.detail, rec11.detail[-60:])
+        # 程式每按一次，fixture 就跳一次 alert；訊息只出現一次＝程式只自動按了一次
+        check("被擋後程式沒有重複硬按（只自動按一次）",
+              rec11.detail.count("機器人驗證失敗") == 1,
+              f"出現 {rec11.detail.count('機器人驗證失敗')} 次")
+        # 舊版會乾等滿 60 秒；等越久 token 越舊，使用者接著手動按更容易被擋
+        check("看到「機器人驗證失敗」就馬上退回，沒有乾等 60 秒",
+              elapsed11 < 20, f"整檔耗時 {elapsed11:.1f} 秒")
+
+        print("\n[12] 被擋的訊息若顯示在頁面上（不是 alert），也要馬上退回")
+        ctx5 = browser.new_context()
+        p12 = ctx5.new_page()
+        p12.add_init_script("window.__FAIL_BOT_DOM = true")
+        nav.goto(p12, LIST_URL, expect_contains="tc_estock_welshas")
+        t12 = {m.stock_code: m for m in read_meetings(p12, sel)}["1101"]
+        calls["n"] = 0
+
+        def fake_ask_dom() -> str:
+            calls["n"] += 1
+            p12.evaluate("window.__FAIL_BOT_DOM = false")
+            p12.click(sel["confirm"]["submit_button"])
+            p12.wait_for_url(lambda u: "6_01" in u, timeout=10000)
+            return ""
+
+        vote_mod._ask_confirmed = fake_ask_dom
+        t_start = time.monotonic()
+        rec12 = vote_one(p12, sel, t12, confirm=True)
+        elapsed12 = time.monotonic() - t_start
+        check("最後仍然投成功", rec12.status == "OK", rec12.status + " / " + rec12.detail[:60])
+        check("頁面文字型的失敗也有退回手動", calls["n"] == 1 and rec12.submitted_by == "manual",
+              f"{calls['n']} 次 / {rec12.submitted_by}")
+        check("紀錄標明是從頁面文字看到的", "[頁面文字] 機器人驗證失敗" in rec12.detail,
+              rec12.detail[-40:])
+        check("頁面文字型也馬上退回，沒有乾等", elapsed12 < 20, f"整檔耗時 {elapsed12:.1f} 秒")
+        ctx5.close()
 
         print("\n[6] 多分頁：登入後平台另開頁，不可寫死第一個分頁")
         # 重現實際 bug：pages[0] 停在登入頁，使用者其實在另一個分頁
