@@ -10,7 +10,9 @@
                           （--auto-submit 才會讓程式先試著自動按一次）
                               ▼
                       完成頁 /001/6_01.html  處理結果「投票已完成！」
-                        └─ #go 確認 ─▶ 回清單
+                        └─ #go 確認 ─▶ 首頁；程式再自己導回清單投下一檔
+
+  全部投完後，查詢截圖由 receipts.py 負責（清單點「查詢」→ /002/01.html）。
 
 ⛔⛔ 定位鐵律：一律用 onclick 裡的函式名，**不准用 name 或 class**。
    確認頁「確認投票結果」與「取消投票」的 name 都是 "button"；
@@ -253,26 +255,24 @@ def vote_one(
             rec.status = "OK"
             how = "程式自動送出" if rec.submitted_by == "auto" else "你手動送出"
             rec.detail = f"{how}｜{text.strip()[:200]}" + (f"｜{auto_note}" if auto_note else "")
-            # 投完票的證明另放「投票完成」資料夾，方便一次找齊上傳給代領平台
-            rec.receipt = evidence.receipt_shot(page, code, meeting.company)
-            if rec.receipt:
-                rec.screenshots.append(rec.receipt)
+            # 完成頁只寫「投票完成」，不是要交給代領平台的畫面（使用者 2026-10-14）。
+            # 留在過程資料夾；真正的證明是全部投完後到清單點「查詢」拍的（receipts.py）。
+            snap("4_完成頁")
             print(f"   ✅ 投票已完成（{how}）")
-            if rec.receipt:
-                print(f"      完成截圖：{rec.receipt}")
         else:
             snap("x_完成頁無成功字樣")   # 失敗的不放進「投票完成」，留在過程資料夾
             rec.status = "FAILED"
             rec.detail = f"到了完成頁但找不到「{done_cfg['success_text']}」：{text.strip()[:200]}"
             print(f"   ❌ {rec.detail}")
 
-        # ⑦ 按完成頁的「確認」回清單
+        # ⑦ 按完成頁的「確認」，照網站正常流程走。它會回**首頁**、不是清單
+        #    （使用者 2026-10-14 實測），所以之後一律自己導回清單，接著投下一檔。
         try:
             page.click(done_cfg["ack_button"], timeout=NAV_TIMEOUT)
-            _wait_url(page, selectors["meetings"]["url_contains"])
+            page.wait_for_url(lambda u: done_cfg["url_contains"] not in u, timeout=NAV_TIMEOUT)
         except Exception as exc:
-            print(f"   ⚠️ 按完成頁「確認」失敗，直接回清單：{exc}")
-            _back_to_list(page, selectors)
+            print(f"   ⚠️ 按完成頁「確認」沒有反應（不影響，票已投出）：{exc}")
+        _back_to_list(page, selectors)
         return rec
 
     except AbortAll:

@@ -60,6 +60,11 @@ def main() -> int:
             executable_path=os.environ.get("TDCC_CHROMIUM_PATH") or None,
         )
         page = browser.new_page()
+        # 記錄主分頁導覽過的每個網址。fixture 的「修改／撤銷」會導到 DISASTER_ 網址，
+        # 就算程式之後又導回清單，這裡也留得下證據（只看 title 會被下一次導頁蓋掉）。
+        visited: list[str] = []
+        page.on("framenavigated",
+                lambda fr: visited.append(fr.url) if fr == page.main_frame else None)
         nav.goto(page, TMP_URL, expect_contains="tc_estock_welshas")
 
         print("\n[1] 讀清單與解析（經 _tmp 入口，表格資料延遲 1.5 秒才出現）")
@@ -115,19 +120,16 @@ def main() -> int:
         check("狀態 OK", rec2.status == "OK", rec2.status + " / " + rec2.detail)
         check("完成頁驗到「投票已完成」", "投票已完成" in rec2.detail, rec2.detail[:60])
         check("預設就是等使用者按確認（程式沒有自己按）", calls["n"] == 1, f"{calls['n']} 次")
-        check("完成後回到清單頁", "tc_estock_welshas" in page.url, page.url.rsplit("/", 1)[-1])
+        check("完成頁的「確認」回首頁後，程式自己導回清單頁",
+              "tc_estock_welshas" in page.url, page.url.rsplit("/", 1)[-1])
+        check("確實有經過首頁（照網站正常流程按了「確認」）",
+              any(u.split("?")[0].endswith("/000/index.html") for u in visited))
         check("這一輪也沒觸發取消／修改", "災難" not in page.title(), page.title())
         check("紀錄標明是使用者手動送出", rec2.submitted_by == "manual", rec2.submitted_by)
-        receipt = Path(rec2.receipt) if rec2.receipt else None
-        check("完成截圖存在「投票完成」資料夾",
-              bool(receipt) and receipt.exists() and receipt.parent == evidence.receipt_dir(),
-              str(receipt.relative_to(_TMP)) if receipt else "沒有產生")
-        check("完成截圖檔名含代號與公司名",
-              bool(receipt) and receipt.name.startswith("00878_國泰永續高股息_"),
-              receipt.name if receipt else "-")
-        check("預跑的那一檔沒有完成截圖", rec.receipt == "", rec.receipt or "（無，正確）")
-        others = [p.name for p in evidence.receipt_dir().glob("*.png")]
-        check("「投票完成」資料夾只有真的投完的那一張", len(others) == 1, str(others))
+        # 2026-10-14：完成頁只寫「投票完成」，不是要交給代領平台的畫面 → 只留過程資料夾
+        check("完成頁截圖留在過程資料夾", any("4_完成頁" in s for s in rec2.screenshots))
+        check("投票階段不會把完成頁放進「投票完成」（那裡只放查詢頁）",
+              rec2.receipt == "" and not list(evidence.receipt_dir().glob("*.png")))
 
         print("\n[10] --auto-submit、自動按成功：不需要使用者動手")
         nav.goto(page, LIST_URL, expect_contains="tc_estock_welshas")
@@ -139,8 +141,7 @@ def main() -> int:
         check("自動送出成功時，沒有打擾使用者", calls["n"] == 0, f"{calls['n']} 次")
         check("總結文字寫明是程式自動送出", rec10.detail.startswith("程式自動送出"),
               rec10.detail[:20])
-        check("完成截圖也存在「投票完成」資料夾",
-              bool(rec10.receipt) and Path(rec10.receipt).parent == evidence.receipt_dir())
+        check("完成頁截圖留在過程資料夾", any("4_完成頁" in s for s in rec10.screenshots))
         check("自動送出這一輪沒觸發取消／修改", "災難" not in page.title(), page.title())
 
         print("\n[11] --auto-submit 被機器人驗證擋下（真站實際情況）→ 記下訊息、退回手動")
@@ -204,6 +205,38 @@ def main() -> int:
               rec12.detail[-40:])
         check("頁面文字型也馬上退回，沒有乾等", elapsed12 < 20, f"整檔耗時 {elapsed12:.1f} 秒")
         ctx5.close()
+
+        print("\n[13] 查詢截圖：清單點「查詢」→ 拍已投票結果頁 → 存「投票完成」→ 回清單")
+        from tdcc_vote.receipts import capture_receipt
+        from tdcc_vote.meetings import voted
+        nav.goto(page, LIST_URL, expect_contains="tc_estock_welshas")
+        ms13 = {m.stock_code: m for m in read_meetings(page, sel)}
+        r13 = capture_receipt(page, sel, ms13["00878"])
+        check("狀態 RECEIPT", r13.status == "RECEIPT", r13.status + " / " + r13.detail)
+        shot13 = Path(r13.receipt) if r13.receipt else None
+        check("查詢頁截圖存在「投票完成」資料夾",
+              bool(shot13) and shot13.exists() and shot13.parent == evidence.receipt_dir(),
+              str(shot13.relative_to(_TMP)) if shot13 else "沒有產生")
+        check("檔名含代號與公司名", bool(shot13) and shot13.name.startswith("00878_國泰永續高股息_"),
+              shot13.name if shot13 else "-")
+        check("有記下查詢頁上的議案與選擇", any("贊成" in p["cells"] for p in r13.proposals),
+              str(r13.proposals)[:60])
+        check("拍完回到清單頁", "tc_estock_welshas" in page.url, page.url.rsplit("/", 1)[-1])
+        check("真的有經過查詢頁（/002/01.html）",
+              any("/002/01.html" in u for u in visited))
+
+        from dataclasses import replace
+        r13b = capture_receipt(page, sel, replace(ms13["1101"], actions={}))
+        check("沒有「查詢」連結的檔 → RECEIPT_FAILED，不硬點", r13b.status == "RECEIPT_FAILED",
+              r13b.detail)
+
+        print("\n[14] 補截圖模式挑檔：只挑「已投票」且有查詢連結的")
+        picked = [m.stock_code for m in voted(list(ms13.values()))]
+        check("只挑到已投票的 1909", picked == ["1909"], str(picked))
+
+        print("\n[15] ⛔ 全程沒有按到「修改」或「撤銷」")
+        bad = [u for u in visited if "DISASTER" in u]
+        check("主分頁從未導到 DISASTER 網址", not bad, str(bad) if bad else "（無，正確）")
 
         print("\n[6] 多分頁：登入後平台另開頁，不可寫死第一個分頁")
         # 重現實際 bug：pages[0] 停在登入頁，使用者其實在另一個分頁

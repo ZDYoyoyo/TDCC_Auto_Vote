@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from playwright.sync_api import Page
 
 ACTION_VOTE = "vote"
+ACTION_QUERY = "qry"
 
 
 @dataclass
@@ -159,3 +160,12 @@ def votable(meetings: list[Meeting]) -> list[Meeting]:
     以平台給不給連結為準，比自己解析中文字串可靠。
     """
     return [m for m in meetings if m.can_vote]
+
+
+def voted(meetings: list[Meeting], status_text: str = "已投票") -> list[Meeting]:
+    """已經投過、而且有「查詢」連結的檔（補查詢截圖模式用）。
+
+    這裡只能靠「投票狀況」欄的平台原文判斷：已投票且已過投票期的檔
+    只剩「查詢」連結，沒有其他連結可以分辨（2026-09-30 實抓：1909 榮成）。
+    """
+    return [m for m in meetings if status_text in m.status and ACTION_QUERY in m.actions]

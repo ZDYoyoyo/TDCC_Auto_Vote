@@ -108,14 +108,36 @@ def main() -> int:
     recs_d = []
     for f in (tmp / "D" / "logs").glob("*.jsonl"):
         recs_d += [json.loads(x) for x in f.read_text(encoding="utf-8").splitlines()]
-    check("兩檔都投成功", [r["status"] for r in recs_d] == ["OK", "OK"],
+    # 使用者要的順序（2026-10-14）：先全部投完，再回清單逐檔點「查詢」截圖
+    check("順序是「先投完兩檔，再截兩張查詢頁」",
+          [r["status"] for r in recs_d] == ["OK", "OK", "RECEIPT", "RECEIPT"],
           str([r["status"] for r in recs_d]))
-    check("兩檔都標明是程式自動送出", all(r["submitted_by"] == "auto" for r in recs_d),
-          str([r["submitted_by"] for r in recs_d]))
+    votes_d = [r for r in recs_d if r["status"] == "OK"]
+    shots_d = [r for r in recs_d if r["status"] == "RECEIPT"]
+    check("兩檔都標明是程式自動送出", all(r["submitted_by"] == "auto" for r in votes_d),
+          str([r["submitted_by"] for r in votes_d]))
+    check("投過的每一檔都有查詢截圖",
+          sorted(r["stock_code"] for r in shots_d) == sorted(r["stock_code"] for r in votes_d))
     receipts = sorted(p.name for p in (tmp / "D" / "evidence" / "投票完成").glob("*.png"))
-    check("「投票完成」資料夾有兩張，各帶代號", len(receipts) == 2
+    check("「投票完成」資料夾剛好兩張，各帶代號", len(receipts) == 2
           and receipts[0].startswith("00878_") and receipts[1].startswith("1101_"),
           str(receipts))
+    check("「投票完成」裡的都是查詢頁（不是完成頁）",
+          sorted(Path(r["receipt"]).name for r in shots_d) == receipts)
+
+    print("\n[F] --receipts-only：不投票，只對「已投票」的檔補拍查詢截圖")
+    code = run_main(TMP_ENTRY, ["", ""], tmp / "F", ["--receipts-only"])
+    check("main() 回傳 0", code == 0, str(code))
+    recs_f = []
+    for f in (tmp / "F" / "logs").glob("*.jsonl"):
+        recs_f += [json.loads(x) for x in f.read_text(encoding="utf-8").splitlines()]
+    check("只有一筆查詢截圖紀錄，沒有任何投票紀錄",
+          [r["status"] for r in recs_f] == ["RECEIPT"], str([r["status"] for r in recs_f]))
+    check("挑到的是已投票的 1909", [r["stock_code"] for r in recs_f] == ["1909"],
+          str([r["stock_code"] for r in recs_f]))
+    shots_f = sorted(p.name for p in (tmp / "F" / "evidence" / "投票完成").glob("*.png"))
+    check("「投票完成」有 1909 的查詢截圖", len(shots_f) == 1 and shots_f[0].startswith("1909_"),
+          str(shots_f))
 
     print("\n[C] 污染檢查")
     for d in ("evidence", "logs", "explore", "profile"):

@@ -40,10 +40,12 @@ meetings:
   # [已驗證] 作業項目那一欄的連結。動作與參數全在 onclick 裡：
   #   getOverlapMeeting('<證券代號>','<動作>','<會議日期YYYYMMDD>')
   #   動作：vote=投票 / qry=查詢 / modify=修改 / repael=撤銷（平台自己拼錯，照抄）
-  # ⚠️ 只點 vote。modify 會改掉已投的票，repael 會撤銷，都不可誤觸。
+  # ⚠️ 只點 vote 與 qry。modify 會改掉已投的票，repael 會撤銷，都不可誤觸。
   action_link: "a.c-actLink"
   action_onclick_re: "getOverlapMeeting\\('([^']*)','([^']*)','([^']*)'\\)"
   action_vote: "vote"
+  action_query: "qry"          # 查詢 → 已投票結果頁（要截圖給代領平台的那一頁）
+  voted_status_text: "已投票"   # 投票狀況欄的平台原文；補截圖模式用它挑出已投的檔
 
   # [已驗證] 篩選用的連結（onclick）
   filter_not_voted: "sortList('nVote')"
@@ -108,9 +110,13 @@ done:
   url_contains: "/evote/shareholder/001/6_01.html"  # [已驗證]
   result_table: "table.o-table.c-sysMsg_table"      # [已驗證] 作業項目／處理結果
   success_text: "投票已完成"                          # [已驗證] 處理結果欄的字串
-  ack_button: "#go"                                  # [已驗證] 「確認」→ doProcess()
+  ack_button: "#go"                                  # [已驗證] 「確認」→ doProcess()，回**首頁**
+                                                     #   （使用者 2026-10-14 實測，不是回清單）
 
-# ── 已投票結果的查詢／列印頁 ────────────────────────────────────
+# ── 已投票結果的查詢頁（要截圖給代領平台的是這一頁，不是完成頁）──────
+# 使用者 2026-10-14：完成頁只寫「投票完成」，真正要截的是清單上點「查詢」後的這一頁。
+# [已驗證] 頁面結構（2026-09-30 explore）；[待驗證] 從清單點 qry 是否直接到這一頁
+#   （函式名 getOverlapMeeting 暗示同日多場會議時可能先跳選擇畫面）。
 receipt:
   url_contains: "/evote/shareholder/002/01.html"   # [已驗證]
   print_button: "#printPage"

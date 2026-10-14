@@ -16,7 +16,10 @@ if (location.search.indexOf('top=1') === -1) {
 <script>
 function getOverlapMeeting(code, action, date) {
   if (action === 'vote') { location.href = '../001/1_03.html?c=' + code; }
-  else { document.title = 'FIXTURE 不該被點到:' + action; }
+  else if (action === 'qry') { location.href = '../002/01.html?c=' + code; }
+  // 修改／撤銷：導到 DISASTER_ 網址。測試會記錄所有導覽過的網址，
+  // 只要出現過 DISASTER 就代表程式按錯了（即使之後又導回別頁也抓得到）。
+  else { location.href = 'DISASTER_' + action + '.html'; }
 }
 function sortList(k){ document.title = 'FIXTURE sort ' + k; }
 </script>
@@ -28,7 +31,8 @@ setTimeout(function () {
       <td><a class="c-actLink" href="#" onclick="getOverlapMeeting('1101','vote','20261013');">投票</a>
           <a class="c-actLink" href="#" onclick="getOverlapMeeting('1101','qry','20261013');">查詢</a></td><td></td></tr>
   <tr><td>00878 國泰永續高股息</td><td>115/10/20 115/10/01~115/10/17</td><td>未投票</td>
-      <td><a class="c-actLink" href="#" onclick="getOverlapMeeting('00878','vote','20261020');">投票</a></td><td></td></tr>
+      <td><a class="c-actLink" href="#" onclick="getOverlapMeeting('00878','vote','20261020');">投票</a>
+          <a class="c-actLink" href="#" onclick="getOverlapMeeting('00878','qry','20261020');">查詢</a></td><td></td></tr>
   <tr><td>1909 榮成</td><td>115/10/01 115/09/16~115/09/28</td><td>已投票</td>
       <td><a class="c-actLink" href="#" onclick="getOverlapMeeting('1909','qry','20261001');">查詢</a>
           <a class="c-actLink" href="#" onclick="getOverlapMeeting('1909','modify','20261001');">修改</a>
