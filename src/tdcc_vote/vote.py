@@ -145,6 +145,7 @@ def vote_one(
                 return rec
 
             if done_cfg["url_contains"] in page.url:
+                rec.submitted_by = "manual"
                 break
 
             # 還沒到完成頁：可能沒按、或被機器人驗證擋下來
@@ -156,13 +157,19 @@ def vote_one(
         # ⑥ 驗證完成頁真的寫著成功，不是「跑完了」就算成功
         rows = evidence.read_table(page, done_cfg["result_table"])
         text = " ".join(" ".join(r["cells"]) for r in rows)
-        snap("4_完成頁")
 
         if done_cfg["success_text"] in text:
             rec.status = "OK"
             rec.detail = text.strip()[:200]
+            # 投完票的證明另放「投票完成」資料夾，方便一次找齊上傳給代領平台
+            rec.receipt = evidence.receipt_shot(page, code, meeting.company)
+            if rec.receipt:
+                rec.screenshots.append(rec.receipt)
             print("   ✅ 投票已完成")
+            if rec.receipt:
+                print(f"      完成截圖：{rec.receipt}")
         else:
+            snap("x_完成頁無成功字樣")   # 失敗的不放進「投票完成」，留在過程資料夾
             rec.status = "FAILED"
             rec.detail = f"到了完成頁但找不到「{done_cfg['success_text']}」：{text.strip()[:200]}"
             print(f"   ❌ {rec.detail}")

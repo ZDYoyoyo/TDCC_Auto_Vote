@@ -30,6 +30,8 @@ class VoteRecord:
     detail: str = ""
     proposals: list[dict[str, str]] = field(default_factory=list)  # 當下看到的議案與選擇
     screenshots: list[str] = field(default_factory=list)
+    receipt: str = ""         # 投票完成頁的截圖（另存在「投票完成」資料夾）
+    submitted_by: str = ""    # manual=使用者在確認頁按的 / ""=沒送出
     recorded_at: str = ""
 
     def __post_init__(self) -> None:
@@ -46,6 +48,32 @@ def shot(page: Page, stock_code: str, kind: str) -> str:
         page.screenshot(path=str(path), full_page=True)
     except Exception as exc:
         print(f"   ⚠️ 截圖失敗（{kind}）：{exc}")
+        return ""
+    return str(path)
+
+
+def receipt_dir() -> Path:
+    """投票完成截圖的資料夾。所有日期放在一起，方便一次找齊上傳給代領平台。
+
+    ⚠️ 用函式而不是模組常數：測試會把 EVIDENCE_DIR 換成暫存目錄，
+       若在 import 時就算好路徑，會指向真實目錄而污染使用者資料。
+    """
+    return EVIDENCE_DIR / "投票完成"
+
+
+def receipt_shot(page: Page, stock_code: str, company: str) -> str:
+    """完成頁截圖，另存到「投票完成」資料夾。
+
+    檔名：<代號>_<公司>_<日期_時間>.png（帶公司名，上傳時一眼認得出來）。
+    """
+    folder = receipt_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    name = f"{safe_name(stock_code)}_{safe_name(company, 20)}_{stamp()}.png"
+    path = folder / name
+    try:
+        page.screenshot(path=str(path), full_page=True)
+    except Exception as exc:
+        print(f"   ⚠️ 完成頁截圖失敗：{exc}")
         return ""
     return str(path)
 

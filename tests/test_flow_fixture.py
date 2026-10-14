@@ -115,6 +115,17 @@ def main() -> int:
         check("有等使用者按確認（沒有程式自己按送出）", calls["n"] == 1, f"{calls['n']} 次")
         check("完成後回到清單頁", "tc_estock_welshas" in page.url, page.url.rsplit("/", 1)[-1])
         check("這一輪也沒觸發取消／修改", "災難" not in page.title(), page.title())
+        check("紀錄標明是使用者手動送出", rec2.submitted_by == "manual", rec2.submitted_by)
+        receipt = Path(rec2.receipt) if rec2.receipt else None
+        check("完成截圖存在「投票完成」資料夾",
+              bool(receipt) and receipt.exists() and receipt.parent == evidence.receipt_dir(),
+              str(receipt.relative_to(_TMP)) if receipt else "沒有產生")
+        check("完成截圖檔名含代號與公司名",
+              bool(receipt) and receipt.name.startswith("00878_國泰永續高股息_"),
+              receipt.name if receipt else "-")
+        check("預跑的那一檔沒有完成截圖", rec.receipt == "", rec.receipt or "（無，正確）")
+        others = [p.name for p in evidence.receipt_dir().glob("*.png")]
+        check("「投票完成」資料夾只有真的投完的那一張", len(others) == 1, str(others))
 
         print("\n[6] 多分頁：登入後平台另開頁，不可寫死第一個分頁")
         # 重現實際 bug：pages[0] 停在登入頁，使用者其實在另一個分頁
