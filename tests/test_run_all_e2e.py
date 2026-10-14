@@ -87,10 +87,23 @@ def main() -> int:
     check("自動存下頁面供診斷", len(dumps) == 1, str(len(dumps)))
     check("沒有產生任何投票紀錄", not (tmp / "B" / "logs").exists())
 
-    print("\n[D] 真投模式（--confirm）：自動按確認，兩檔都投完、不需要使用者動手")
+    print("\n[E] 真投模式預設（只加 --confirm）：必須停下來問使用者，程式不可自己按")
+    # 每一檔在確認頁都回答 s（跳過）。若程式自己按了送出，紀錄會是 OK/auto 而不是 SKIPPED。
+    code = run_main(TMP_ENTRY, ["", "", "s", "s"], tmp / "E", ["--confirm"])
+    check("main() 回傳 0（跳過不算失敗）", code == 0, str(code))
+    recs_e = []
+    for f in (tmp / "E" / "logs").glob("*.jsonl"):
+        recs_e += [json.loads(x) for x in f.read_text(encoding="utf-8").splitlines()]
+    check("兩檔都停下來問、使用者跳過", [r["status"] for r in recs_e] == ["SKIPPED", "SKIPPED"],
+          str([r["status"] for r in recs_e]))
+    check("沒有任何一檔是程式自動送出的", all(r["submitted_by"] == "" for r in recs_e),
+          str([r["submitted_by"] for r in recs_e]))
+    check("沒有產生任何完成截圖", not (tmp / "E" / "evidence" / "投票完成").exists())
+
+    print("\n[D] --confirm --auto-submit：自動按確認，兩檔都投完、不需要使用者動手")
     # 只排兩個答案（登入後 Enter、開始 Enter）。若程式退回手動而多要輸入，
     # queue 會被 pop 空而丟例外，測試就會失敗——用來證明真的沒有打擾使用者。
-    code = run_main(TMP_ENTRY, ["", ""], tmp / "D", ["--confirm"])
+    code = run_main(TMP_ENTRY, ["", ""], tmp / "D", ["--confirm", "--auto-submit"])
     check("main() 回傳 0", code == 0, str(code))
     recs_d = []
     for f in (tmp / "D" / "logs").glob("*.jsonl"):

@@ -6,8 +6,8 @@
                         └─ 下一步 checkVote()
                               ▼
                       確認頁 /001/2_01.html   ⚠️ 掛 invisible reCAPTCHA
-                        └─「確認投票結果」：程式先自動按一次；
-                          被機器人驗證擋下 → 退回請使用者手動按
+                        └─「確認投票結果」：預設由**使用者本人**按
+                          （--auto-submit 才會讓程式先試著自動按一次）
                               ▼
                       完成頁 /001/6_01.html  處理結果「投票已完成！」
                         └─ #go 確認 ─▶ 回清單
@@ -19,11 +19,11 @@
 
 ⛔ 程式永遠不點：取消投票、修改、撤銷。
 
-⚠️ 自動按「確認投票結果」（2026-10-14 使用者明確授權、並切換權限模式後加入）：
-   只做**單純的點擊**。不偽裝瀏覽器指紋、不裝 stealth 外掛、不接驗證碼代解——
-   機器人檢查照常判斷，它說不行就是不行，程式退回請人手動按，不再往下繞。
-   先前使用者在確認頁停留過久才按、遇到「機器人驗證失敗」，可能是 token 過期；
-   程式到確認頁幾秒內就按，token 較新鮮，所以值得一試。
+⚠️ 自動按「確認投票結果」（_try_auto_submit，**預設關閉**）：
+   2026-10-14 使用者明確授權後加入，只做單純點擊（不偽裝指紋、不接代解）。
+   **同日真站實測：被機器人驗證擋下。** 使用者要求改回自己按，所以預設關閉，
+   只在加 --auto-submit 時啟用。保留程式碼是為了網站日後改版時可以再試；
+   被擋就是被擋，不要往下繞。
 """
 
 from __future__ import annotations
@@ -120,7 +120,7 @@ def _try_auto_submit(page: Page, selectors: dict) -> tuple[bool, list[str]]:
 
 
 def _ask_confirmed() -> str:
-    """等使用者在瀏覽器按下「確認投票結果」（自動按被擋、或關閉自動按時才會用到）。
+    """等使用者在瀏覽器按下「確認投票結果」（預設流程；--auto-submit 被擋時也會退回這裡）。
 
     ⚠️ 刻意用 input() 等使用者講「我按完了」，而不是輪詢網頁等它自己變。
     先前 explore 用輪詢等登入，結果程式 10 分鐘不讀鍵盤、看起來像當掉。
@@ -142,13 +142,13 @@ def vote_one(
     selectors: dict,
     meeting: Meeting,
     confirm: bool = False,
-    auto_submit: bool = True,
+    auto_submit: bool = False,
 ) -> VoteRecord:
     """投一檔。
 
     confirm=False（預設）：跑到確認頁就停，不送出。
-    confirm=True：送出。auto_submit=True 先自動按一次，被擋才請使用者手動按；
-                  auto_submit=False 直接請使用者手動按。
+    confirm=True：送出。預設請使用者在確認頁手動按；
+                  auto_submit=True 才先自動按一次（真站實測會被擋），被擋再退回手動。
     """
     code = meeting.stock_code
     rec = VoteRecord(
@@ -203,7 +203,7 @@ def vote_one(
             _back_to_list(page, selectors)
             return rec
 
-        # ⑤ 送出：先自動按一次，被擋才退回手動
+        # ⑤ 送出：預設由使用者按；--auto-submit 時先自動按一次，被擋才退回手動
         need_manual = True
         auto_note = ""   # 自動送出失敗的原因；投成功也要保留，真站診斷要靠它
         if auto_submit:

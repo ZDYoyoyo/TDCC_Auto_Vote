@@ -89,14 +89,14 @@ confirm:
   #   - hidden textarea: #g-recaptcha-response-100000（name=g-recaptcha-response）
   #   - iframe: google.com/recaptcha/enterprise/anchor?...&size=invisible
   #   同一個 sitekey 也用在登入頁。
-  # 2026-10-14 起（使用者明確授權）：程式先**單純點擊**一次「確認投票結果」，
-  #   被機器人驗證擋下就退回請使用者手動按。
-  #   ⛔ 不偽裝指紋、不接代解服務——詳見 docs/PLAN.md 第九節。
+  # 「確認投票結果」預設由**使用者本人**按。
+  #   2026-10-14 試過讓程式單純點擊（--auto-submit），真站實測被機器人驗證擋下，
+  #   使用者要求改回自己按。⛔ 不偽裝指紋、不接代解服務——詳見 docs/PLAN.md 第九節。
   recaptcha_response: 'textarea[name="g-recaptcha-response"]'
   recaptcha_iframe: 'iframe[src*="recaptcha/enterprise/anchor"]'
 
   # [已驗證] ⚠️ 用 onclick 定位：本頁「確認投票結果」與「取消投票」name 都是 "button"
-  submit_button: "button[onclick*='checkMeetingPartner']"   # 自動送出時點這顆（只點一次）
+  submit_button: "button[onclick*='checkMeetingPartner']"   # 預設只用來偵測；--auto-submit 時點一次
   modify_button: "button[onclick*='modifyVote']"
   cancel_button: "button[onclick*='giveUpVote']"
 

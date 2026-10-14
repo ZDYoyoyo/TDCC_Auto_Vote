@@ -8,9 +8,8 @@ set "PYTHONPATH=%~dp0src"
 
 echo ==========================================
 echo   REAL VOTING  (--confirm)
-echo   The program presses the confirm button itself.
-echo   If the site blocks it, it asks YOU to press it.
-echo   Add --manual-submit to always press it yourself.
+echo   Votes are cast only when YOU press the
+echo   confirm button in the browser.
 echo ==========================================
 echo.
 

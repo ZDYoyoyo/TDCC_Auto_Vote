@@ -1,10 +1,10 @@
 """批次投票主程式。
 
 分工：
-  程式：讀清單 → 篩出可投票 → 逐檔點進去 → 全部贊成 → 下一步 →
-        自動按一次「確認投票結果」→ 截圖歸檔
-  你  ：只有在自動送出被確認頁的隱形機器人驗證擋下時，才需要手動按
-        （--manual-submit 可以關掉自動按，一律由你按）
+  程式：讀清單 → 篩出可投票 → 逐檔點進去 → 全部贊成 → 下一步 → 截圖歸檔
+  你  ：在確認頁按一下「確認投票結果」
+        （確認頁有隱形機器人驗證；2026-10-14 實測程式自動按會被擋，所以預設由你按。
+         --auto-submit 可讓程式先試著按一次，被擋再交給你）
 
 ⚠️ 預設是 --dry-run（跑完整流程但停在確認頁不送出）。要真的投票才加 --confirm。
 """
@@ -57,8 +57,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="集保電子投票批次輔助（半自動）")
     ap.add_argument("--confirm", action="store_true",
                     help="真的投票。不加這個就是預跑，停在確認頁不送出")
-    ap.add_argument("--manual-submit", action="store_true",
-                    help="不要自動按「確認投票結果」，每一檔都由你自己按")
+    ap.add_argument("--auto-submit", action="store_true",
+                    help="讓程式先試著自動按「確認投票結果」（2026-10-14 實測會被機器人驗證擋下）")
     ap.add_argument("--only", default="",
                     help="只處理這些證券代號，逗號分隔，例：--only 1101,2330")
     ap.add_argument("--profile", type=Path, default=DEFAULT_PROFILE)
@@ -72,11 +72,11 @@ def main(argv: list[str] | None = None) -> int:
     print("=" * 60)
     if args.confirm:
         print("  模式：⚠️ 真的投票（--confirm）")
-        if args.manual_submit:
-            print("  每一檔填好後會停下來，由你在瀏覽器按「確認投票結果」。")
-        else:
-            print("  程式會自動按「確認投票結果」；若被機器人驗證擋下，")
+        if args.auto_submit:
+            print("  程式會先試著自動按「確認投票結果」；若被機器人驗證擋下，")
             print("  會停下來請你手動按。")
+        else:
+            print("  每一檔填好後會停下來，由你在瀏覽器按「確認投票結果」。")
     else:
         print("  模式：預跑（不會送出任何票）")
         print("  會跑完整流程並停在確認頁截圖，但不送出。要真投票請加 --confirm。")
@@ -182,7 +182,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"\n[{i}/{len(targets)}] {m}")
                 try:
                     rec = vote_one(page, selectors, m, confirm=args.confirm,
-                                   auto_submit=not args.manual_submit)
+                                   auto_submit=args.auto_submit)
                 except AbortAll:
                     print("   已中止批次。")
                     break
