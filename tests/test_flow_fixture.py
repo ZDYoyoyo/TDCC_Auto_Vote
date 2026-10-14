@@ -23,7 +23,8 @@ from playwright.sync_api import sync_playwright  # noqa: E402
 
 from tdcc_vote import evidence, nav  # noqa: E402
 from tdcc_vote.login_gate import is_logged_in, pick_page  # noqa: E402
-from tdcc_vote.meetings import read_meetings, votable  # noqa: E402
+from tdcc_vote.meetings import (  # noqa: E402
+    declared_total, list_page_info, read_meetings, votable, wait_for_rows)
 from tdcc_vote.vote import vote_one  # noqa: E402
 
 # ⚠ 測試不可污染真實資料：截圖與紀錄導到暫存目錄，
@@ -35,6 +36,7 @@ evidence.RESULTS_DIR = _TMP / 'logs'
 FIXTURES = ROOT / "tests" / "fixtures"
 LIST_URL = (FIXTURES / "evote/shareholder/000/tc_estock_welshas.html").as_uri()
 LOGIN_URL = (FIXTURES / "evote/login/shareholder.html").as_uri()
+TMP_URL = (FIXTURES / "evote/shareholder/000/tc_estock_welshas_tmp.html").as_uri()
 
 failures: list[str] = []
 
@@ -47,7 +49,7 @@ def check(name: str, cond: bool, extra: str = "") -> None:
 
 def main() -> int:
     sel = yaml.safe_load((ROOT / "config/selectors.yaml").read_text(encoding="utf-8"))
-    sel["meetings"]["url"] = LIST_URL          # 指向 fixture
+    sel["meetings"]["url"] = TMP_URL           # 指向 fixture：走網站選單入口 _tmp
     sel["meetings"]["url_contains"] = "tc_estock_welshas"
 
     with sync_playwright() as pw:
@@ -57,9 +59,9 @@ def main() -> int:
             executable_path=os.environ.get("TDCC_CHROMIUM_PATH") or None,
         )
         page = browser.new_page()
-        nav.goto(page, LIST_URL, expect_contains="tc_estock_welshas")
+        nav.goto(page, TMP_URL, expect_contains="tc_estock_welshas")
 
-        print("\n[1] 讀清單與解析")
+        print("\n[1] 讀清單與解析（經 _tmp 入口，表格資料延遲 1.5 秒才出現）")
         ms = read_meetings(page, sel)
         check("讀到 3 筆", len(ms) == 3, f"實際 {len(ms)}")
         by_code = {m.stock_code: m for m in ms}
@@ -192,6 +194,29 @@ def main() -> int:
         except RuntimeError as exc:
             reported = "不在預期的頁面" in str(exc)
         check("容忍重導但落在錯頁面 → 仍然報錯", reported)
+
+        print("\n[8] 表格延遲載入：不等就讀會讀到 0 筆（2026-10-14 實際踩過）")
+        ctx4 = browser.new_context()
+        t5 = ctx4.new_page()
+        nav.goto(t5, LIST_URL, expect_contains="tc_estock_welshas")
+        early = list_page_info(t5, sel)
+        check("重現確認：剛導完時表格只有表頭（若失敗代表 fixture 沒重現，本組無意義）",
+              early["row_count"] <= 1, f"row_count={early['row_count']}")
+        check("剛導完時平台筆數還是 0（所以不能拿它當「真的沒有」的依據）",
+              declared_total(early) == 0, early["page_info"])
+        check("wait_for_rows 等得到資料", wait_for_rows(t5, sel))
+        late = list_page_info(t5, sel)
+        check("等完之後平台顯示 3 筆", declared_total(late) == 3, late["page_info"])
+        check("等完之後讀得到 3 筆", len(read_meetings(t5, sel)) == 3)
+
+        print("\n[9] 讀不到表格時的診斷資訊")
+        t6 = ctx4.new_page()
+        nav.goto(t6, LOGIN_URL)
+        miss = list_page_info(t6, sel)
+        check("沒有表格時 table_found=False", miss["table_found"] is False)
+        check("沒有表格時 declared_total 回 None（不可誤判成 0 筆）",
+              declared_total(miss) is None)
+        ctx4.close()
 
         browser.close()
 

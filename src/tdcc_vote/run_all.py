@@ -19,7 +19,8 @@ from . import evidence, nav
 from .browser import DEFAULT_PROFILE, launch
 from .config import load_selectors
 from .login_gate import list_tabs, open_login_page, pick_page
-from .meetings import Meeting, read_meetings, votable
+from .explore import DEFAULT_OUT as EXPLORE_DIR, dump
+from .meetings import Meeting, declared_total, list_page_info, read_meetings, votable
 from .vote import AbortAll, vote_one
 
 
@@ -119,7 +120,39 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
 
             meetings = read_meetings(page, selectors)
+            info = list_page_info(page, selectors)
+            total = declared_total(info)
             _print_list(meetings)
+
+            # ⚠️ 讀到 0 筆不可以直接說「沒有可投票的項目」。
+            #    2026-10-14 實跑就是這樣：程式說沒有，使用者明明有。
+            #    假的「沒事」比報錯更危險——使用者會以為不用投了。
+            if not meetings:
+                # ⚠️ 平台的「共計0筆」也不能當成「真的沒有」的證據：
+                #    頁面載入中時它會先顯示 0 筆，資料進來後才變成真的數字
+                #    （fixture 測試第 8 組有重現）。所以一律當成「不確定」處理。
+                print("\n" + "!" * 60)
+                print("  ⚠️ 讀不到清單，但這**不代表**你沒有可投票的項目。")
+                if total == 0:
+                    print("     平台顯示 0 筆。可能真的沒有，也可能是頁面資料還沒載完。")
+                print(f"     網址：{info.get('url')}")
+                print(f"     找到表格：{'是' if info.get('table_found') else '否'}"
+                      f"　表格列數：{info.get('row_count')}"
+                      f"　平台顯示：{info.get('page_info') or '(讀不到)'}")
+                print("!" * 60)
+                try:
+                    folder = dump(page, EXPLORE_DIR, 1)
+                    print(f"\n  已把這一頁存下來：{folder}")
+                    print("  請把裡面的 structure.md 交給 Claude 診斷。")
+                except Exception as exc:
+                    print(f"\n  （存頁面失敗：{exc}）")
+                print("  在修好之前，請先到網站上手動投票，不要被這個工具卡住截止日。")
+                return 1
+
+            if total is not None and total > len(meetings):
+                print(f"\n  ⚠️ 平台說共 {total} 筆，只讀到 {len(meetings)} 筆。"
+                      "可能有分頁，程式還不會翻頁——只會處理讀到的這些。")
+                print("     其餘的請自己上網站確認。")
 
             targets = votable(meetings)
             if only:

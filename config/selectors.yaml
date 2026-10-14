@@ -23,9 +23,14 @@ login:
 
 # ── 步驟 1：可投票股東會清單 ────────────────────────────────────
 meetings:
-  # [已驗證] 清單頁（選單上叫「投票作業」）
-  url: "https://stockservices.tdcc.com.tw/evote/shareholder/000/tc_estock_welshas.html"
+  # [已驗證] 清單頁入口＝網站選單「投票作業」實際連的網址（_tmp）。
+  # ⚠️ 不要改成直接開 tc_estock_welshas.html：2026-10-14 實跑直接開那一頁，
+  #    表格讀到 0 筆（使用者明明有可投票項目）。_tmp 疑似是先準備資料、再跳到
+  #    最終頁的中繼頁。照網站自己的導覽路徑走，比自己猜最終網址可靠。
+  #    最終頁網址形如 tc_estock_welshas.html?top=1，url_contains 兩者都涵蓋。
+  url: "https://stockservices.tdcc.com.tw/evote/shareholder/000/tc_estock_welshas_tmp.html"
   url_contains: "/evote/shareholder/000/tc_estock_welshas"
+  table_wait_ms: 20000         # 表格資料是頁面載入後才填進去的，最多等這麼久
 
   table: "#stockInfo"          # [已驗證] 欄位：證券代號公司簡稱／會議日期投票起迄日／
                                #          投票狀況／作業項目／eGift 資格

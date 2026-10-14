@@ -120,8 +120,15 @@ PYTHONPATH=src python -m tdcc_vote.explore --help
 | `src/tdcc_vote/evidence.py` | 截圖命名、結果 jsonl（投票當下就寫，不事後重算） |
 | `src/tdcc_vote/run_all.py` | 批次驅動與結尾報告 |
 | `tests/test_flow_fixture.py` | 對 fixture 跑完整流程。**不代表真實網站可行** |
+| `tests/test_run_all_e2e.py` | 直接執行 `run_all.main()`，從登入後跑到結尾報告 |
+| `src/tdcc_vote/nav.py` | 導頁，容忍集保頁面自我重導（`?top=1`）。**一律用它，不要直接 `page.goto`** |
 
-跑測試：`PYTHONPATH=src python tests/test_flow_fixture.py`
+跑測試（兩支都要跑）：
+
+```bash
+PYTHONPATH=src python tests/test_flow_fixture.py   # 零件：解析、定位、撞名陷阱、導頁
+PYTHONPATH=src python tests/test_run_all_e2e.py    # 整條：直接跑 run_all.main()
+```
 
 ⛔ **定位鐵律：一律用 `onclick` 裡的函式名，不准用 `name` 或 `class`。**
 確認頁「確認投票結果」與「取消投票」的 `name` 都是 `button`；

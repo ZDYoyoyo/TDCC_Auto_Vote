@@ -57,9 +57,59 @@ def _js_rows(page: Page, table_sel: str, link_sel: str) -> list[dict]:
     )
 
 
-def read_meetings(page: Page, selectors: dict) -> list[Meeting]:
-    """讀清單頁的表格。第 0 列是表頭，跳過。"""
+def list_page_info(page: Page, selectors: dict) -> dict:
+    """清單頁的現況，用於診斷「為什麼讀到 0 筆」。"""
     cfg = selectors["meetings"]
+    try:
+        return page.evaluate(
+            """([tableSel, infoSel]) => {
+                const t = document.querySelector(tableSel);
+                const i = document.querySelector(infoSel);
+                return {
+                    table_found: !!t,
+                    row_count: t ? t.rows.length : 0,
+                    page_info: i ? (i.innerText || '').replace(/\\s+/g, ' ').trim() : '',
+                };
+            }""",
+            [cfg["table"], cfg.get("page_info", "#tbDisplayTag")],
+        ) | {"url": page.url}
+    except Exception as exc:
+        return {"table_found": False, "row_count": 0, "page_info": "",
+                "url": page.url, "error": str(exc)}
+
+
+def declared_total(info: dict) -> int | None:
+    """從「共計N筆」取出平台自己宣稱的筆數；讀不到回 None。"""
+    m = re.search(r"共計\s*(\d+)\s*筆", info.get("page_info", ""))
+    return int(m.group(1)) if m else None
+
+
+def wait_for_rows(page: Page, selectors: dict) -> bool:
+    """等表格出現資料列（表頭之外至少一列）。回傳是否等到。
+
+    ⚠️ 為什麼要等：表格資料是頁面載入**之後**才用 JS 填進去的。
+    2026-10-14 實跑在頁面骨架一出來就讀，只讀到表頭 → 回報「0 筆」，
+    使用者明明有可投票項目。explore 抓得到，是因為人按 Enter 時早就載完了。
+    """
+    cfg = selectors["meetings"]
+    try:
+        page.wait_for_function(
+            "sel => { const t = document.querySelector(sel); return !!t && t.rows.length > 1; }",
+            arg=cfg["table"],
+            timeout=int(cfg.get("table_wait_ms", 20000)),
+        )
+        return True
+    except Exception:
+        return False
+
+
+def read_meetings(page: Page, selectors: dict) -> list[Meeting]:
+    """讀清單頁的表格。第 0 列是表頭，跳過。
+
+    會先等表格真的有資料（見 wait_for_rows）。呼叫端不必、也不該自己先讀。
+    """
+    cfg = selectors["meetings"]
+    wait_for_rows(page, selectors)
     pattern = re.compile(cfg["action_onclick_re"])
     rows = _js_rows(page, cfg["table"], cfg["action_link"])
 
